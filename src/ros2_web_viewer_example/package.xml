@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>ros2_web_viewer_example</name>
+  <version>0.1.0</version>
+  <description>
+    Example package demonstrating ros2_web_viewer with a simulated UR3e robot,
+    a synthetic point cloud and a synthetic camera image.
+  </description>
+  <maintainer email="mhanheide@lincoln.ac.uk">Marc Hanheide</maintainer>
+  <license>MIT</license>
+
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>ros2_web_viewer</depend>
+
+  <exec_depend>ur_description</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

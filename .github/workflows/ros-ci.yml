@@ -43,6 +43,9 @@ jobs:
       - name: setup ROS environment
         uses: ros-tooling/setup-ros@v0.7
 
+      - name: install Python dependencies
+        run: pip3 install fastapi "uvicorn[standard]" numpy opencv-python-headless
+
       - name: build and test ROS 2
         uses: ros-tooling/action-ros-ci@v0.3
         with:

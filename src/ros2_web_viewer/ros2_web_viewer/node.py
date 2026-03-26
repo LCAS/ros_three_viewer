@@ -123,7 +123,7 @@ class WebViewerNode(Node):
 
     def _on_urdf(self, msg: String):
         self._urdf = msg.data
-        self.get_logger().info('robot_description received (%d bytes)', len(msg.data))
+        self.get_logger().info(f'robot_description received ({len(msg.data)} bytes)')
 
     def _on_joint_states(self, msg: JointState):
         payload = {
@@ -167,11 +167,11 @@ class WebViewerNode(Node):
             }
             self._server.broadcast_threadsafe(json.dumps(payload))
         except ImportError:
-            self.get_logger().warn('cv_bridge / cv2 not available; image topic disabled',
-                                   throttle_duration_sec=10.0)
+            self.get_logger().warning('cv_bridge / cv2 not available; image topic disabled',
+                                      throttle_duration_sec=10.0)
         except Exception as exc:
-            self.get_logger().warn(f'Image encode error: {exc}',
-                                   throttle_duration_sec=5.0)
+            self.get_logger().warning(f'Image encode error: {exc}',
+                                      throttle_duration_sec=5.0)
 
     def _on_pointcloud(self, msg: PointCloud2, topic: str):
         try:
@@ -190,8 +190,8 @@ class WebViewerNode(Node):
             }
             self._server.broadcast_threadsafe(json.dumps(payload))
         except Exception as exc:
-            self.get_logger().warn(f'PointCloud2 decode error: {exc}',
-                                   throttle_duration_sec=5.0)
+            self.get_logger().warning(f'PointCloud2 decode error: {exc}',
+                                      throttle_duration_sec=5.0)
 
 
 # ---------------------------------------------------------------------------

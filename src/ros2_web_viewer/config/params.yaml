@@ -1,0 +1,20 @@
+/**:
+  ros__parameters:
+    # Web server
+    host: "0.0.0.0"
+    port: 8080
+
+    # Topics to bridge — adjust to your robot's topic names
+    image_topics:
+      - /camera/image_raw
+      # - /camera/rgb/image_raw
+      # - /realsense/color/image_raw
+
+    pointcloud_topics:
+      - /points
+      # - /velodyne_points
+      # - /realsense/depth/color/points
+
+    # Performance
+    pointcloud_max_points: 8000   # downsamples heavier clouds
+    image_jpeg_quality:    65     # 1-100; lower = faster but blurrier

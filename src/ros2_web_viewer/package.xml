@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>ros2_web_viewer</name>
+  <version>0.2.0</version>
+  <description>
+    Web-based 3D robot visualiser for ROS2 Jazzy. Displays URDF robot models,
+    TF frames, joint states, point clouds and camera images in a browser.
+    Designed for public exhibits (PhenAIx) but fully reusable.
+  </description>
+  <maintainer email="mhanheide@lincoln.ac.uk">Marc Hanheide</maintainer>
+  <license>MIT</license>
+
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>tf2_msgs</depend>
+  <depend>tf2_ros</depend>
+  <depend>std_msgs</depend>
+  <depend>cv_bridge</depend>
+
+  <exec_depend>python3-fastapi</exec_depend>
+  <exec_depend>python3-uvicorn</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

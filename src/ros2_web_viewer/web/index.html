@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ROS2 Web Viewer · Digital Twin</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Three.js ES module imports via importmap -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three":          "https://unpkg.com/three@0.161.0/build/three.module.js",
+      "three/addons/":  "https://unpkg.com/three@0.161.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+
+  <!-- ── Three.js canvas ─────────────────────────────── -->
+  <canvas id="canvas"></canvas>
+
+  <!-- ── Aesthetic overlays ──────────────────────────── -->
+  <div id="scanlines"></div>
+  <div id="sweep"></div>
+  <div id="vignette"></div>
+
+  <!-- Corner brackets -->
+  <div class="corner" id="corner-tl"></div>
+  <div class="corner" id="corner-tr"></div>
+  <div class="corner" id="corner-bl"></div>
+  <div class="corner" id="corner-br"></div>
+
+  <!-- ── Top bar ─────────────────────────────────────── -->
+  <div id="topbar">
+    <div id="logo">Phen<span>AI</span>x</div>
+    <div id="tagline">Digital Twin · Plant Phenotyping Platform</div>
+    <div id="topbar-spacer"></div>
+    <div id="ws-pill">
+      <div id="ws-dot"></div>
+      <span id="ws-label">OFFLINE</span>
+    </div>
+  </div>
+
+  <!-- ── Status panel (bottom-left) ──────────────────── -->
+  <div id="status-panel">
+    <div id="status-header">System Status</div>
+    <div class="status-row">
+      <span class="status-label">ROBOT</span>
+      <span class="status-value warn" id="st-robot">waiting…</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">JOINTS</span>
+      <span class="status-value" id="st-joints">—</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">CLOUD</span>
+      <span class="status-value" id="st-cloud">—</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">IMAGE</span>
+      <span class="status-value" id="st-image">—</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">FPS</span>
+      <span class="status-value" id="st-fps">—</span>
+    </div>
+  </div>
+
+  <!-- ── Camera image panel (bottom-right) ───────────── -->
+  <div id="image-panel" class="hidden">
+    <div id="image-header">
+      <span>&#x25CF;&nbsp;SENSOR FEED</span>
+      <span id="image-topic-label">—</span>
+    </div>
+    <img id="camera-image" alt="camera feed" style="display:none" />
+    <div id="image-placeholder">NO SIGNAL</div>
+  </div>
+
+  <!-- ── Loading screen ──────────────────────────────── -->
+  <div id="loading">
+    <div id="loading-title">Phen<span>AI</span>x</div>
+    <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+    <div id="loading-sub">Initialising digital twin…</div>
+  </div>
+
+  <!-- ── Application ─────────────────────────────────── -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>

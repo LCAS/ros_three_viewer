@@ -1,0 +1,686 @@
+/**
+ * ROS2 Web Viewer — Three.js frontend
+ *
+ * Features:
+ *  • Live URDF parsing with joint-state animation (box/cylinder/sphere geometry + STL meshes)
+ *  • Point cloud with custom GLSL shader (per-point colour, additive glow, distance attenuation)
+ *  • Camera image panel
+ *  • UnrealBloom post-processing pass for scanner glow
+ *  • WebSocket auto-reconnect bridge to FastAPI backend
+ *  • TF tree cached for frame transforms
+ */
+
+import * as THREE from 'three';
+import { OrbitControls }   from 'three/addons/controls/OrbitControls.js';
+import { STLLoader }       from 'three/addons/loaders/STLLoader.js';
+import { EffectComposer }  from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass }      from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass }      from 'three/addons/postprocessing/OutputPass.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MAX_CLOUD_PTS = 60_000;
+const URDF_RETRY_MS = 2_000;
+const WS_RETRY_MS   = 3_000;
+const WS_URL        = `ws://${location.host}/ws`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Three.js — renderer
+// ─────────────────────────────────────────────────────────────────────────────
+
+const canvas = document.getElementById('canvas');
+
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: true,
+  powerPreference: 'high-performance',
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scene
+// ─────────────────────────────────────────────────────────────────────────────
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x030a10);
+scene.fog = new THREE.FogExp2(0x030a10, 0.07);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Camera & controls
+// ─────────────────────────────────────────────────────────────────────────────
+
+const camera = new THREE.PerspectiveCamera(
+  55, window.innerWidth / window.innerHeight, 0.001, 60);
+camera.position.set(2.0, 1.6, 2.0);
+camera.lookAt(0, 0.5, 0);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.4, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 0.1;
+controls.maxDistance = 20;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.35;
+controls.update();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Post-processing  (bloom → output)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  /*strength*/ 0.55, /*radius*/ 0.45, /*threshold*/ 0.78);
+composer.addPass(bloomPass);
+
+const outputPass = new OutputPass();
+composer.addPass(outputPass);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lighting
+// ─────────────────────────────────────────────────────────────────────────────
+
+scene.add(new THREE.AmbientLight(0x102545, 0.7));
+
+const keyLight = new THREE.DirectionalLight(0xddeeff, 2.8);
+keyLight.position.set(3, 5, 2);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(1024, 1024);
+keyLight.shadow.camera.near = 0.1;
+keyLight.shadow.camera.far = 20;
+scene.add(keyLight);
+
+const fillLight = new THREE.PointLight(0x00c896, 2.5, 10);
+fillLight.position.set(-2.5, 1.5, -1);
+scene.add(fillLight);
+
+const rimLight = new THREE.PointLight(0xf5a623, 1.2, 8);
+rimLight.position.set(1, 3, -3);
+scene.add(rimLight);
+
+scene.add(new THREE.HemisphereLight(0x1a3050, 0x080808, 0.6));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scene decorations
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Grid
+const gridHelper = new THREE.GridHelper(10, 30, 0x003355, 0x001122);
+gridHelper.material.transparent = true;
+gridHelper.material.opacity = 0.55;
+scene.add(gridHelper);
+
+// Ground plane (shadow receiver)
+const groundMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(10, 10),
+  new THREE.ShadowMaterial({ opacity: 0.25 }),
+);
+groundMesh.rotation.x = -Math.PI / 2;
+groundMesh.receiveShadow = true;
+scene.add(groundMesh);
+
+// Origin axes marker
+{
+  const axesMat = (hex) => new THREE.MeshBasicMaterial({ color: hex });
+  const axGeo = new THREE.CylinderGeometry(0.005, 0.005, 0.15, 6);
+  const mkAxis = (color, rot) => {
+    const m = new THREE.Mesh(axGeo, axesMat(color));
+    m.rotation.copy(rot);
+    m.position.y = 0.075;
+    return m;
+  };
+  const axGroup = new THREE.Group();
+  axGroup.add(mkAxis(0xff2244, new THREE.Euler(0, 0, -Math.PI / 2)));  // X red
+  axGroup.add(mkAxis(0x22ff44, new THREE.Euler(0, 0, 0)));              // Y green
+  axGroup.add(mkAxis(0x2244ff, new THREE.Euler(Math.PI / 2, 0, 0)));   // Z blue
+  scene.add(axGroup);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Point Cloud — custom GLSL shader
+// ─────────────────────────────────────────────────────────────────────────────
+
+const cloudPositions = new Float32Array(MAX_CLOUD_PTS * 3);
+const cloudColors    = new Float32Array(MAX_CLOUD_PTS * 3);
+
+const cloudGeo = new THREE.BufferGeometry();
+cloudGeo.setAttribute('position', new THREE.BufferAttribute(cloudPositions, 3));
+cloudGeo.setAttribute('color',    new THREE.BufferAttribute(cloudColors, 3));
+cloudGeo.setDrawRange(0, 0);
+
+const cloudMat = new THREE.ShaderMaterial({
+  vertexShader: /* glsl */`
+    attribute vec3 color;
+    varying   vec3 vColor;
+    uniform   float uSize;
+
+    void main() {
+      vColor = color;
+      vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+      gl_PointSize = uSize * (260.0 / -mvPos.z);
+      gl_Position  = projectionMatrix * mvPos;
+    }
+  `,
+  fragmentShader: /* glsl */`
+    varying vec3 vColor;
+
+    void main() {
+      vec2  uv = 2.0 * gl_PointCoord - 1.0;
+      float r  = dot(uv, uv);
+      if (r > 1.0) discard;
+
+      // Soft glowing disc
+      float core  = smoothstep(1.0, 0.0, r);
+      float glow  = pow(core, 1.5);
+      float alpha = glow * 0.92;
+
+      gl_FragColor = vec4(vColor * (0.7 + 0.3 * glow), alpha);
+    }
+  `,
+  uniforms: { uSize: { value: 2.2 } },
+  vertexColors: true,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});
+
+const pointCloud = new THREE.Points(cloudGeo, cloudMat);
+pointCloud.frustumCulled = false;
+scene.add(pointCloud);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Viridis colourmap (JS-side, for any unmapped points)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function viridis(t) {
+  t = Math.max(0, Math.min(1, t));
+  // Polynomial approximation
+  const r = 0.267 + t * (1.055  + t * (-2.80  + t * 3.49));
+  const g = 0.005 + t * (1.594  + t * (-0.531 + t * -0.068));
+  const b = 0.329 + t * (1.015  + t * (-2.758 + t * 1.414));
+  return [Math.max(0, Math.min(1, r)), Math.max(0, Math.min(1, g)), Math.max(0, Math.min(1, b))];
+}
+
+// Decode base64 → Float32Array, fill buffers
+function updatePointCloud(b64, count, frameId) {
+  const binary = atob(b64);
+  const buf    = new ArrayBuffer(binary.length);
+  const bytes  = new Uint8Array(buf);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+  const f = new Float32Array(buf);
+  const n = Math.min(count, MAX_CLOUD_PTS);
+
+  let zMin = Infinity, zMax = -Infinity;
+  for (let i = 0; i < n; i++) {
+    const z = f[i * 6 + 2];
+    if (isFinite(z)) { zMin = Math.min(zMin, z); zMax = Math.max(zMax, z); }
+  }
+  const zRange = (zMax - zMin) > 1e-6 ? (zMax - zMin) : 1;
+
+  for (let i = 0; i < n; i++) {
+    const fi = i * 6;
+    cloudPositions[i * 3]     = f[fi];
+    cloudPositions[i * 3 + 1] = f[fi + 1];
+    cloudPositions[i * 3 + 2] = f[fi + 2];
+
+    let r = f[fi + 3], g = f[fi + 4], b = f[fi + 5];
+    if (!isFinite(r) || r < 0) {
+      // Fallback height colourmap
+      [r, g, b] = viridis((f[fi + 2] - zMin) / zRange);
+    }
+    cloudColors[i * 3]     = r;
+    cloudColors[i * 3 + 1] = g;
+    cloudColors[i * 3 + 2] = b;
+  }
+
+  cloudGeo.setDrawRange(0, n);
+  cloudGeo.attributes.position.needsUpdate = true;
+  cloudGeo.attributes.color.needsUpdate    = true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// URDF robot — scene graph
+// ─────────────────────────────────────────────────────────────────────────────
+
+const robotRoot = new THREE.Group();
+robotRoot.name = 'robot_root';
+scene.add(robotRoot);
+
+// Maps populated when URDF is parsed
+const jointPivots       = {};   // joint name → Group (the pivot at joint origin)
+const jointAxes_        = {};   // joint name → Vector3 (normalised)
+const jointTypes_       = {};   // joint name → string
+const jointOriginQuats  = {};   // joint name → Quaternion (initial, from origin/rpy)
+const jointOriginPos    = {};   // joint name → Vector3   (initial, from origin/xyz)
+
+let   robotLoaded       = false;
+let   pendingJointState = null;
+
+// ── Material factory ──────────────────────────────────────────────────────
+
+function robotMaterial(hexColor, emissiveMult = 0.12) {
+  const col = new THREE.Color(hexColor);
+  return new THREE.MeshStandardMaterial({
+    color: col,
+    metalness: 0.72,
+    roughness: 0.28,
+    emissive: col.clone().multiplyScalar(emissiveMult),
+    emissiveIntensity: 1.0,
+    envMapIntensity: 0.6,
+  });
+}
+
+const DEFAULT_LINK_COLOR  = 0x2a6ccc;
+const JOINT_SPHERE_COLOR  = 0x00d2aa;
+
+// ── URDF XML parsing ──────────────────────────────────────────────────────
+
+function parseOriginEl(el) {
+  if (!el) return { xyz: [0, 0, 0], rpy: [0, 0, 0] };
+  const xyz = (el.getAttribute('xyz') || '0 0 0').trim().split(/\s+/).map(Number);
+  const rpy = (el.getAttribute('rpy') || '0 0 0').trim().split(/\s+/).map(Number);
+  return { xyz, rpy };
+}
+
+function applyOrigin(obj, origin) {
+  obj.position.set(origin.xyz[0], origin.xyz[1], origin.xyz[2]);
+  obj.quaternion.setFromEuler(
+    new THREE.Euler(origin.rpy[0], origin.rpy[1], origin.rpy[2], 'XYZ'));
+}
+
+function parseMaterialColor(visualEl) {
+  const matEl = visualEl?.querySelector('material > color');
+  if (!matEl) return DEFAULT_LINK_COLOR;
+  const rgba = (matEl.getAttribute('rgba') || '0.2 0.4 0.8 1').trim().split(/\s+/).map(Number);
+  return new THREE.Color(rgba[0], rgba[1], rgba[2]);
+}
+
+function createLinkVisuals(linkEl, linkGroup) {
+  for (const visual of linkEl.querySelectorAll('visual')) {
+    const origin  = parseOriginEl(visual.querySelector('origin'));
+    const geomEl  = visual.querySelector('geometry');
+    if (!geomEl) continue;
+
+    const child   = geomEl.firstElementChild;
+    if (!child) continue;
+
+    const tag     = child.tagName.toLowerCase();
+    const color   = parseMaterialColor(visual);
+    const mat     = robotMaterial(color);
+
+    let mesh = null;
+
+    if (tag === 'box') {
+      const size = (child.getAttribute('size') || '0.1 0.1 0.1').trim().split(/\s+/).map(Number);
+      mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), mat);
+
+    } else if (tag === 'cylinder') {
+      const r = parseFloat(child.getAttribute('radius') || 0.04);
+      const l = parseFloat(child.getAttribute('length') || 0.1);
+      // URDF cylinders are along Z; Three.js CylinderGeometry is along Y
+      mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, l, 20), mat);
+      mesh.rotation.x = Math.PI / 2;
+
+    } else if (tag === 'sphere') {
+      const r = parseFloat(child.getAttribute('radius') || 0.04);
+      mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), mat);
+
+    } else if (tag === 'mesh') {
+      const filename = child.getAttribute('filename') || '';
+      const url = filename.replace('package://', '/mesh/');
+
+      if (url.toLowerCase().endsWith('.stl')) {
+        // Placeholder octahedron while STL loads
+        const phMat = robotMaterial(color, 0.05);
+        phMat.transparent = true; phMat.opacity = 0.35;
+        const ph = new THREE.Mesh(new THREE.OctahedronGeometry(0.025), phMat);
+        applyOrigin(ph, origin);
+        linkGroup.add(ph);
+
+        const scaleAttr = child.getAttribute('scale');
+        const loader = new STLLoader();
+        loader.load(url, (geo) => {
+          if (scaleAttr) {
+            const s = scaleAttr.trim().split(/\s+/).map(Number);
+            geo.scale(s[0] ?? 1, s[1] ?? 1, s[2] ?? 1);
+          }
+          geo.computeVertexNormals();
+          const realMesh = new THREE.Mesh(geo, robotMaterial(color));
+          realMesh.castShadow = true;
+          applyOrigin(realMesh, origin);
+          linkGroup.remove(ph);
+          linkGroup.add(realMesh);
+        }, undefined, () => { /* silently keep placeholder */ });
+        continue;  // handled async
+      }
+      // Unsupported mesh type → box placeholder
+      mesh = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.05), robotMaterial(color));
+    }
+
+    if (mesh) {
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      applyOrigin(mesh, origin);
+      linkGroup.add(mesh);
+    }
+  }
+}
+
+async function loadURDF(xmlString) {
+  // Clear previous robot
+  while (robotRoot.children.length) robotRoot.remove(robotRoot.children[0]);
+  for (const k of Object.keys(jointPivots))      delete jointPivots[k];
+  for (const k of Object.keys(jointAxes_))        delete jointAxes_[k];
+  for (const k of Object.keys(jointTypes_))       delete jointTypes_[k];
+  for (const k of Object.keys(jointOriginQuats))  delete jointOriginQuats[k];
+  for (const k of Object.keys(jointOriginPos))    delete jointOriginPos[k];
+
+  const doc = new DOMParser().parseFromString(xmlString, 'text/xml');
+  if (doc.querySelector('parseerror')) {
+    console.error('URDF parse error');
+    return;
+  }
+
+  // ── Collect links ─────────────────────────────────────────────────────
+  const linkGroups = {};
+  for (const linkEl of doc.querySelectorAll('link')) {
+    const name  = linkEl.getAttribute('name');
+    const group = new THREE.Group();
+    group.name  = `link_${name}`;
+    createLinkVisuals(linkEl, group);
+    linkGroups[name] = group;
+  }
+
+  // ── Collect joints and wire scene graph ───────────────────────────────
+  const childLinkNames = new Set();
+
+  for (const jEl of doc.querySelectorAll('joint')) {
+    const jName   = jEl.getAttribute('name');
+    const jType   = jEl.getAttribute('type') || 'fixed';
+    const parent  = jEl.querySelector('parent')?.getAttribute('link');
+    const child   = jEl.querySelector('child')?.getAttribute('link');
+    if (!parent || !child || !linkGroups[parent] || !linkGroups[child]) continue;
+
+    const origin  = parseOriginEl(jEl.querySelector('origin'));
+    const axisEl  = jEl.querySelector('axis');
+    const axXYZ   = (axisEl?.getAttribute('xyz') || '0 0 1').trim().split(/\s+/).map(Number);
+
+    // Pivot group placed at joint origin within parent link
+    const pivot = new THREE.Group();
+    pivot.name  = `joint_${jName}`;
+    applyOrigin(pivot, origin);
+    pivot.add(linkGroups[child]);
+    linkGroups[parent].add(pivot);
+
+    // Store initial transform so joint-state rotation is relative to it
+    jointPivots[jName]      = pivot;
+    jointAxes_[jName]       = new THREE.Vector3(...axXYZ).normalize();
+    jointTypes_[jName]      = jType;
+    jointOriginQuats[jName] = pivot.quaternion.clone();
+    jointOriginPos[jName]   = pivot.position.clone();
+
+    // Small teal sphere at each mobile joint origin (visual cue)
+    if (jType !== 'fixed') {
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.012, 8, 6),
+        new THREE.MeshStandardMaterial({
+          color: JOINT_SPHERE_COLOR,
+          emissive: JOINT_SPHERE_COLOR,
+          emissiveIntensity: 0.6,
+          metalness: 0.9,
+          roughness: 0.1,
+        }),
+      );
+      pivot.add(dot);
+    }
+
+    childLinkNames.add(child);
+  }
+
+  // ── Find root link and attach ─────────────────────────────────────────
+  const rootName = Object.keys(linkGroups).find(n => !childLinkNames.has(n))
+                   ?? Object.keys(linkGroups)[0];
+  if (rootName && linkGroups[rootName]) {
+    robotRoot.add(linkGroups[rootName]);
+  }
+
+  robotLoaded = true;
+  setStatus('robot', '🤖 loaded', 'ok');
+  console.log('[URDF] Loaded, root link:', rootName,
+    '| joints:', Object.keys(jointPivots).length);
+
+  if (pendingJointState) {
+    applyJointStates(pendingJointState.name, pendingJointState.position);
+    pendingJointState = null;
+  }
+}
+
+function applyJointStates(names, positions) {
+  if (!robotLoaded) {
+    pendingJointState = { name: names, position: positions };
+    return;
+  }
+  for (let i = 0; i < names.length; i++) {
+    const pivot = jointPivots[names[i]];
+    if (!pivot) continue;
+    const axis = jointAxes_[names[i]];
+    const type = jointTypes_[names[i]];
+    const oQ   = jointOriginQuats[names[i]];
+    const oP   = jointOriginPos[names[i]];
+
+    if (type === 'prismatic') {
+      pivot.position.copy(oP).addScaledVector(axis, positions[i]);
+    } else if (type !== 'fixed') {
+      const delta = new THREE.Quaternion().setFromAxisAngle(axis, positions[i]);
+      pivot.quaternion.multiplyQuaternions(oQ, delta);
+    }
+  }
+  const n = names.length;
+  setStatus('joints', `${n} joint${n !== 1 ? 's' : ''} active`, 'ok');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TF tree (stored, not yet visualised but available for extensions)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const tfTree = {};  // frame_id → { parent, tx, ty, tz, rx, ry, rz, rw }
+
+function applyTF(transforms, _static) {
+  for (const t of transforms) {
+    tfTree[t.child] = {
+      parent: t.parent,
+      tx: t.tx, ty: t.ty, tz: t.tz,
+      rx: t.rx, ry: t.ry, rz: t.rz, rw: t.rw,
+    };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WebSocket — connect / reconnect / dispatch
+// ─────────────────────────────────────────────────────────────────────────────
+
+let ws = null;
+
+function connectWS() {
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    setWsStatus(true);
+    console.log('[WS] Connected');
+  };
+
+  ws.onclose = () => {
+    setWsStatus(false);
+    console.log(`[WS] Disconnected — retrying in ${WS_RETRY_MS}ms`);
+    setTimeout(connectWS, WS_RETRY_MS);
+  };
+
+  ws.onerror = (err) => {
+    console.warn('[WS] Error:', err);
+  };
+
+  ws.onmessage = (evt) => {
+    let msg;
+    try { msg = JSON.parse(evt.data); } catch { return; }
+
+    switch (msg.type) {
+      case 'joint_states':
+        applyJointStates(msg.name, msg.position);
+        break;
+
+      case 'tf':
+        applyTF(msg.transforms, msg.static);
+        break;
+
+      case 'image':
+        updateImage(msg.data, msg.topic);
+        break;
+
+      case 'pointcloud':
+        updatePointCloud(msg.data, msg.count, msg.frame_id);
+        setStatus('cloud', `${msg.count} pts · ${msg.frame_id}`, 'ok');
+        break;
+    }
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Camera image panel
+// ─────────────────────────────────────────────────────────────────────────────
+
+const imagePanel       = document.getElementById('image-panel');
+const cameraImg        = document.getElementById('camera-image');
+const imgPlaceholder   = document.getElementById('image-placeholder');
+const imgTopicLabel    = document.getElementById('image-topic-label');
+
+function updateImage(dataUri, topic) {
+  cameraImg.src = dataUri;
+  cameraImg.style.display = 'block';
+  imgPlaceholder.style.display = 'none';
+  imgTopicLabel.textContent = topic.split('/').pop();
+  imagePanel.classList.remove('hidden');
+  setStatus('image', topic, 'ok');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// URDF fetching (polls until robot_description arrives)
+// ─────────────────────────────────────────────────────────────────────────────
+
+let urdfLoaded = false;
+
+async function fetchURDF() {
+  if (urdfLoaded) return;
+  try {
+    const res = await fetch('/api/urdf');
+    if (res.status === 204) {
+      // Not yet available
+      setTimeout(fetchURDF, URDF_RETRY_MS);
+      return;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const xml = await res.text();
+    if (xml.trim().length > 0) {
+      urdfLoaded = true;
+      await loadURDF(xml);
+    } else {
+      setTimeout(fetchURDF, URDF_RETRY_MS);
+    }
+  } catch (e) {
+    console.warn('[URDF] Fetch failed:', e.message, '— retrying');
+    setTimeout(fetchURDF, URDF_RETRY_MS);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UI helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+const elWsDot   = document.getElementById('ws-dot');
+const elWsLabel = document.getElementById('ws-label');
+
+function setWsStatus(connected) {
+  elWsDot.classList.toggle('connected', connected);
+  elWsLabel.textContent = connected ? 'LIVE' : 'OFFLINE';
+}
+
+function setStatus(key, text, state) {
+  // key: 'robot' | 'joints' | 'cloud' | 'image'
+  const map = { robot: 'st-robot', joints: 'st-joints', cloud: 'st-cloud', image: 'st-image' };
+  const el = document.getElementById(map[key]);
+  if (!el) return;
+  el.textContent = text;
+  el.className = `status-value ${state ?? ''}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Animation loop
+// ─────────────────────────────────────────────────────────────────────────────
+
+let lastTime = performance.now();
+let frameCount = 0;
+let fps = 0;
+const stFPS = document.getElementById('st-fps');
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+
+  // FPS counter
+  frameCount++;
+  const now = performance.now();
+  const dt  = now - lastTime;
+  if (dt >= 1000) {
+    fps = Math.round(frameCount * 1000 / dt);
+    stFPS.textContent = `${fps} fps`;
+    frameCount = 0;
+    lastTime = now;
+  }
+
+  // Pulse the fill light slightly for a living effect
+  fillLight.intensity = 2.3 + 0.4 * Math.sin(now * 0.001);
+
+  composer.render();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Resize handler
+// ─────────────────────────────────────────────────────────────────────────────
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+  bloomPass.resolution.set(window.innerWidth, window.innerHeight);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Loading screen dismiss
+// ─────────────────────────────────────────────────────────────────────────────
+
+const loadingEl = document.getElementById('loading');
+setTimeout(() => {
+  loadingEl.classList.add('fade-out');
+  setTimeout(() => loadingEl.remove(), 900);
+}, 2000);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Start
+// ─────────────────────────────────────────────────────────────────────────────
+
+connectWS();
+fetchURDF();
+animate();

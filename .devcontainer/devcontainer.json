@@ -1,0 +1,36 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
+{
+	"name": "ROS 2 Devcontainer",
+	"build": {
+		"dockerfile": "./Dockerfile",
+		"args": {
+			"BASE_IMAGE": "ros:humble",
+			"GIT_REPO_VERSION": "devcontainer",
+			"GIT_REPO_VERSION_DATE": "devcontainer"
+		},
+		"context": "..",
+		"target": "devcontainer"
+	},
+
+	"postStartCommand": ".devcontainer/post-create.sh",
+    "updateRemoteUserUID": true,
+	"remoteUser": "root",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"GitHub.vscode-pull-request-github",
+				"ms-vscode.cpptools",
+				"JaehyunShim.vscode-ros2",
+				"nonanonno.vscode-ros2",
+				"deitry.colcon-helper",
+				"github.vscode-github-actions"
+			]
+		}
+	},
+	"hostRequirements": {
+		"cpus": 1,
+		"memory": "2gb"
+	}
+}

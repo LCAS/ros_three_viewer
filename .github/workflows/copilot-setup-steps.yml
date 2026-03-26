@@ -41,5 +41,5 @@ jobs:
 
       - name: build workspace
         run: |
-          source /opt/ros/${ROS_DISTRO}/setup.bash
+          source /opt/ros/$ROS_DISTRO/setup.bash
           colcon build --symlink-install --continue-on-error

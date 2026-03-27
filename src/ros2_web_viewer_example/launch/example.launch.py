@@ -16,6 +16,7 @@ Open http://localhost:8080 in a browser once everything is running.
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
 from launch.launch_description_sources import AnyLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
@@ -40,6 +41,18 @@ def generate_launch_description():
             'port', default_value='8080',
             description='Web server port'),
 
+        DeclareLaunchArgument(
+            'enable_pointcloud_sim', default_value='false',
+            description='Launch the simulated point cloud publisher'),
+
+        DeclareLaunchArgument(
+            'enable_image_sim', default_value='false',
+            description='Launch the simulated camera image publisher'),
+
+        DeclareLaunchArgument(
+            'enable_marker_sim', default_value='false',
+            description='Launch the simulated MarkerArray publisher'),
+
         # ── UR3e robot description + joint_state_publisher ───────────────
 
         IncludeLaunchDescription(
@@ -62,6 +75,7 @@ def generate_launch_description():
             executable='pointcloud_sim',
             name='pointcloud_sim',
             output='screen',
+            condition=IfCondition(LaunchConfiguration('enable_pointcloud_sim')),
         ),
 
         # ── Simulated camera image ───────────────────────────────────────
@@ -71,6 +85,7 @@ def generate_launch_description():
             executable='image_sim',
             name='image_sim',
             output='screen',
+            condition=IfCondition(LaunchConfiguration('enable_image_sim')),
         ),
 
         # ── Simulated MarkerArray ────────────────────────────────────────
@@ -80,6 +95,7 @@ def generate_launch_description():
             executable='marker_sim',
             name='marker_sim',
             output='screen',
+            condition=IfCondition(LaunchConfiguration('enable_marker_sim')),
         ),
 
         # ── Web viewer ───────────────────────────────────────────────────

@@ -157,17 +157,17 @@ const cloudColors    = new Float32Array(MAX_CLOUD_PTS * 3);
 
 const cloudGeo = new THREE.BufferGeometry();
 cloudGeo.setAttribute('position', new THREE.BufferAttribute(cloudPositions, 3));
-cloudGeo.setAttribute('color',    new THREE.BufferAttribute(cloudColors, 3));
+cloudGeo.setAttribute('aColor',   new THREE.BufferAttribute(cloudColors, 3));
 cloudGeo.setDrawRange(0, 0);
 
 const cloudMat = new THREE.ShaderMaterial({
   vertexShader: /* glsl */`
-    attribute vec3 color;
+    attribute vec3 aColor;
     varying   vec3 vColor;
     uniform   float uSize;
 
     void main() {
-      vColor = color;
+      vColor = aColor;
       vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
       gl_PointSize = uSize * (260.0 / -mvPos.z);
       gl_Position  = projectionMatrix * mvPos;
@@ -190,7 +190,7 @@ const cloudMat = new THREE.ShaderMaterial({
     }
   `,
   uniforms: { uSize: { value: 2.2 } },
-  vertexColors: true,
+  vertexColors: false,
   transparent: true,
   depthWrite: false,
   blending: THREE.AdditiveBlending,
@@ -248,7 +248,7 @@ function updatePointCloud(b64, count, frameId) {
 
   cloudGeo.setDrawRange(0, n);
   cloudGeo.attributes.position.needsUpdate = true;
-  cloudGeo.attributes.color.needsUpdate    = true;
+  cloudGeo.attributes.aColor.needsUpdate   = true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -47,7 +47,7 @@ def generate_launch_description():
                 PathJoinSubstitution([
                     FindPackageShare('ur_description'),
                     'launch',
-                    'view_ur.launch.xml',
+                    'view_ur.launch.py',
                 ]),
             ]),
             launch_arguments={

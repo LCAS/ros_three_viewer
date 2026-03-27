@@ -509,6 +509,344 @@ function applyTF(transforms, _static) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MarkerArray — visualization_msgs/MarkerArray support
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Marker type constants (from visualization_msgs/msg/Marker.msg)
+const MK = {
+  ARROW: 0, CUBE: 1, SPHERE: 2, CYLINDER: 3,
+  LINE_STRIP: 4, LINE_LIST: 5, CUBE_LIST: 6, SPHERE_LIST: 7,
+  POINTS: 8, TEXT: 9, MESH: 10, TRIANGLE_LIST: 11,
+  ADD: 0, MODIFY: 0, DELETE: 2, DELETEALL: 3,
+};
+
+const markerRoot = new THREE.Group();
+markerRoot.name = 'markers';
+scene.add(markerRoot);
+
+// "ns:id" → Object3D
+const markerObjects = new Map();
+
+// Walk TF chain to compute world-space matrix of a named frame
+function getFrameWorldMatrix(frameId) {
+  const chain = [];
+  let f = frameId;
+  const visited = new Set();
+  while (f && tfTree[f] && !visited.has(f)) {
+    visited.add(f);
+    chain.push(tfTree[f]);
+    f = tfTree[f].parent;
+  }
+  // Compose from root (last) down to frameId (first)
+  const mat = new THREE.Matrix4();
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const t = chain[i];
+    mat.multiply(new THREE.Matrix4().compose(
+      new THREE.Vector3(t.tx, t.ty, t.tz),
+      new THREE.Quaternion(t.rx, t.ry, t.rz, t.rw),
+      new THREE.Vector3(1, 1, 1),
+    ));
+  }
+  return mat;
+}
+
+// Standard MeshStandardMaterial for markers
+function mkMat(r, g, b, a, side = THREE.FrontSide) {
+  return new THREE.MeshStandardMaterial({
+    color: new THREE.Color(r, g, b),
+    opacity: a,
+    transparent: a < 0.999,
+    metalness: 0.3,
+    roughness: 0.5,
+    side,
+  });
+}
+
+// Dispose all geometries/materials/textures in an Object3D hierarchy
+function disposeMarker(obj) {
+  obj.traverse(child => {
+    if (child.geometry) child.geometry.dispose();
+    if (child.material) {
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      for (const m of mats) { if (m.map) m.map.dispose(); m.dispose(); }
+    }
+  });
+}
+
+// Return a Group with a cylinder+cone arrow pointing along +X from origin
+function makeArrowGeom(length, shaftR, headR, r, g, b, a) {
+  const headLen  = Math.min(length * 0.23, headR * 3);
+  const shaftLen = Math.max(length - headLen, 0.001);
+  const group    = new THREE.Group();
+
+  // CylinderGeometry is along Y; rotate -90° around Z → points along +X
+  const shaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(shaftR, shaftR, shaftLen, 8),
+    mkMat(r, g, b, a),
+  );
+  shaft.rotation.z  = -Math.PI / 2;
+  shaft.position.x  = shaftLen / 2;
+
+  const head = new THREE.Mesh(
+    new THREE.ConeGeometry(headR, headLen, 8),
+    mkMat(r, g, b, a),
+  );
+  head.rotation.z = -Math.PI / 2;
+  head.position.x = shaftLen + headLen / 2;
+
+  group.add(shaft, head);
+  return group;
+}
+
+// Build a Three.js Object3D for a single marker (geometry in marker-local space)
+function createMarkerObject(m) {
+  const [r, g, b, a] = [m.r, m.g, m.b, m.a];
+
+  switch (m.type) {
+
+    case MK.ARROW: {
+      const length = m.sx > 0 ? m.sx : 0.5;
+      const shaftR = m.sy > 0 ? m.sy / 2 : length * 0.04;
+      const headR  = m.sz > 0 ? m.sz / 2 : shaftR * 2.5;
+
+      if (m.points && m.points.length >= 2) {
+        // points[0] → points[1] in the reference frame (override pose)
+        const frameMat = getFrameWorldMatrix(m.frame_id);
+        const fPos = new THREE.Vector3();
+        const fQuat = new THREE.Quaternion();
+        frameMat.decompose(fPos, fQuat, new THREE.Vector3());
+
+        const pStart = new THREE.Vector3(...m.points[0]).applyQuaternion(fQuat).add(fPos);
+        const pEnd   = new THREE.Vector3(...m.points[1]).applyQuaternion(fQuat).add(fPos);
+        const dir    = pEnd.clone().sub(pStart);
+        const len2   = dir.length();
+        if (len2 < 1e-6) return null;
+        dir.normalize();
+
+        const sh2R = m.sy > 0 ? m.sy / 2 : len2 * 0.04;
+        const he2R = m.sz > 0 ? m.sz / 2 : sh2R * 2.5;
+        const grp  = makeArrowGeom(len2, sh2R, he2R, r, g, b, a);
+        grp.position.copy(pStart);
+        grp.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir);
+        grp.userData.skipPose = true;
+        return grp;
+      }
+      return makeArrowGeom(length, shaftR, headR, r, g, b, a);
+    }
+
+    case MK.CUBE:
+      return new THREE.Mesh(
+        new THREE.BoxGeometry(m.sx || 0.1, m.sy || 0.1, m.sz || 0.1),
+        mkMat(r, g, b, a),
+      );
+
+    case MK.SPHERE: {
+      const obj = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 12), mkMat(r, g, b, a));
+      obj.scale.set(m.sx || 0.1, m.sy || 0.1, m.sz || 0.1);
+      return obj;
+    }
+
+    case MK.CYLINDER: {
+      // Cylinder axis along Z in ROS; wrap in a Group so local rotation is not
+      // overwritten when applyMarkerPose sets the parent quaternion
+      const wrapper = new THREE.Group();
+      const cyl = new THREE.Mesh(
+        new THREE.CylinderGeometry((m.sx || 0.1) / 2, (m.sy || 0.1) / 2, m.sz || 0.2, 16),
+        mkMat(r, g, b, a),
+      );
+      cyl.rotation.x = Math.PI / 2;  // Y-axis cylinder → Z-axis
+      wrapper.add(cyl);
+      return wrapper;
+    }
+
+    case MK.LINE_STRIP:
+    case MK.LINE_LIST: {
+      if (!m.points || m.points.length < 2) return null;
+      const geo = new THREE.BufferGeometry().setFromPoints(
+        m.points.map(p => new THREE.Vector3(...p)));
+      const hasCol = m.colors && m.colors.length >= m.points.length;
+      const mat = new THREE.LineBasicMaterial({
+        color: hasCol ? 0xffffff : new THREE.Color(r, g, b),
+        opacity: a, transparent: a < 0.999, vertexColors: hasCol,
+      });
+      if (hasCol) {
+        const ca = new Float32Array(m.points.length * 3);
+        for (let i = 0; i < m.points.length; i++) {
+          ca[i * 3] = m.colors[i][0]; ca[i * 3 + 1] = m.colors[i][1]; ca[i * 3 + 2] = m.colors[i][2];
+        }
+        geo.setAttribute('color', new THREE.BufferAttribute(ca, 3));
+      }
+      return m.type === MK.LINE_LIST
+        ? new THREE.LineSegments(geo, mat)
+        : new THREE.Line(geo, mat);
+    }
+
+    case MK.CUBE_LIST: {
+      if (!m.points || m.points.length === 0) return null;
+      const group = new THREE.Group();
+      const geo   = new THREE.BoxGeometry(m.sx || 0.05, m.sy || 0.05, m.sz || 0.05);
+      for (let i = 0; i < m.points.length; i++) {
+        const c   = (m.colors && m.colors[i]) || [r, g, b, a];
+        const msh = new THREE.Mesh(geo, mkMat(c[0], c[1], c[2], c[3] ?? a));
+        msh.position.set(...m.points[i]);
+        group.add(msh);
+      }
+      return group;
+    }
+
+    case MK.SPHERE_LIST: {
+      if (!m.points || m.points.length === 0) return null;
+      const group = new THREE.Group();
+      const geo   = new THREE.SphereGeometry(0.5, 8, 6);
+      for (let i = 0; i < m.points.length; i++) {
+        const c   = (m.colors && m.colors[i]) || [r, g, b, a];
+        const msh = new THREE.Mesh(geo, mkMat(c[0], c[1], c[2], c[3] ?? a));
+        msh.position.set(...m.points[i]);
+        msh.scale.set(m.sx || 0.05, m.sy || 0.05, m.sz || 0.05);
+        group.add(msh);
+      }
+      return group;
+    }
+
+    case MK.POINTS: {
+      if (!m.points || m.points.length === 0) return null;
+      const n      = m.points.length;
+      const posArr = new Float32Array(n * 3);
+      const colArr = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) {
+        posArr[i * 3]     = m.points[i][0];
+        posArr[i * 3 + 1] = m.points[i][1];
+        posArr[i * 3 + 2] = m.points[i][2];
+        const c = (m.colors && m.colors[i]) || [r, g, b];
+        colArr[i * 3]     = c[0];
+        colArr[i * 3 + 1] = c[1];
+        colArr[i * 3 + 2] = c[2];
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+      geo.setAttribute('color',    new THREE.BufferAttribute(colArr, 3));
+      return new THREE.Points(geo, new THREE.PointsMaterial({
+        size: m.sx || 0.05, vertexColors: true,
+        opacity: a, transparent: a < 0.999,
+      }));
+    }
+
+    case MK.TEXT: {
+      // Billboard sprite rendered from an off-screen canvas
+      const cvs = document.createElement('canvas');
+      cvs.width = 512; cvs.height = 128;
+      const ctx = cvs.getContext('2d');
+      ctx.font        = 'bold 68px monospace';
+      ctx.fillStyle   = `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${a})`;
+      ctx.textAlign   = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText((m.text || '').substring(0, 28), cvs.width / 2, cvs.height / 2);
+      const tex    = new THREE.CanvasTexture(cvs);
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+      const h      = m.sz > 0 ? m.sz : 0.2;
+      sprite.scale.set(h * 4, h, 1);
+      return sprite;
+    }
+
+    case MK.MESH: {
+      if (!m.mesh_resource) return null;
+      const url = m.mesh_resource.replace('package://', '/mesh/');
+      if (!url.toLowerCase().endsWith('.stl')) return null;
+      const group = new THREE.Group();
+      new STLLoader().load(url, (geo) => {
+        geo.computeVertexNormals();
+        const msh = new THREE.Mesh(geo, mkMat(r, g, b, a));
+        msh.scale.set(m.sx || 1, m.sy || 1, m.sz || 1);
+        group.add(msh);
+      });
+      return group;
+    }
+
+    case MK.TRIANGLE_LIST: {
+      if (!m.points || m.points.length < 3 || m.points.length % 3 !== 0) return null;
+      const posArr = new Float32Array(m.points.length * 3);
+      for (let i = 0; i < m.points.length; i++) {
+        posArr[i * 3]     = m.points[i][0];
+        posArr[i * 3 + 1] = m.points[i][1];
+        posArr[i * 3 + 2] = m.points[i][2];
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+      if (m.colors && m.colors.length >= m.points.length) {
+        const ca = new Float32Array(m.points.length * 3);
+        for (let i = 0; i < m.points.length; i++) {
+          ca[i * 3] = m.colors[i][0]; ca[i * 3 + 1] = m.colors[i][1]; ca[i * 3 + 2] = m.colors[i][2];
+        }
+        geo.setAttribute('color', new THREE.BufferAttribute(ca, 3));
+        geo.computeVertexNormals();
+        return new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+          vertexColors: true, side: THREE.DoubleSide,
+          opacity: a, transparent: a < 0.999, metalness: 0.2, roughness: 0.6,
+        }));
+      }
+      geo.computeVertexNormals();
+      return new THREE.Mesh(geo, mkMat(r, g, b, a, THREE.DoubleSide));
+    }
+
+    default:
+      console.warn('[Markers] Unsupported marker type:', m.type);
+      return null;
+  }
+}
+
+// Apply TF-frame + marker pose to the object (unless skipPose is set)
+function applyMarkerPose(obj, m) {
+  if (obj.userData.skipPose) return;
+
+  const frameMat = getFrameWorldMatrix(m.frame_id);
+  const fPos  = new THREE.Vector3();
+  const fQuat = new THREE.Quaternion();
+  frameMat.decompose(fPos, fQuat, new THREE.Vector3());
+
+  // World pos = frame_pos + frame_rot * local_pos
+  const wPos  = new THREE.Vector3(m.px, m.py, m.pz).applyQuaternion(fQuat).add(fPos);
+  // World quat = frame_rot * local_rot
+  const wQuat = fQuat.clone().multiply(new THREE.Quaternion(m.rx, m.ry, m.rz, m.rw));
+
+  obj.position.copy(wPos);
+  obj.quaternion.copy(wQuat);
+}
+
+function _removeMarker(key) {
+  const obj = markerObjects.get(key);
+  if (!obj) return;
+  markerRoot.remove(obj);
+  disposeMarker(obj);
+  markerObjects.delete(key);
+}
+
+function _removeAllMarkers(ns) {
+  for (const key of [...markerObjects.keys()]) {
+    if (ns === null || key.startsWith(ns + ':')) _removeMarker(key);
+  }
+}
+
+function updateMarkerArray(msg) {
+  for (const m of msg.markers) {
+    const key = `${m.ns}:${m.id}`;
+
+    if (m.action === MK.DELETE)    { _removeMarker(key); continue; }
+    if (m.action === MK.DELETEALL) { _removeAllMarkers(m.ns || null); continue; }
+
+    // ADD / MODIFY (both == 0): recreate geometry
+    if (markerObjects.has(key)) _removeMarker(key);
+
+    const obj = createMarkerObject(m);
+    if (!obj) continue;
+    applyMarkerPose(obj, m);
+    markerRoot.add(obj);
+    markerObjects.set(key, obj);
+  }
+  const n = markerObjects.size;
+  setStatus('markers', `${n} marker${n !== 1 ? 's' : ''}`, 'ok');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // WebSocket — connect / reconnect / dispatch
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -552,6 +890,10 @@ function connectWS() {
       case 'pointcloud':
         updatePointCloud(msg.data, msg.count, msg.frame_id);
         setStatus('cloud', `${msg.count} pts · ${msg.frame_id}`, 'ok');
+        break;
+
+      case 'marker_array':
+        updateMarkerArray(msg);
         break;
     }
   };
@@ -617,8 +959,11 @@ function setWsStatus(connected) {
 }
 
 function setStatus(key, text, state) {
-  // key: 'robot' | 'joints' | 'cloud' | 'image'
-  const map = { robot: 'st-robot', joints: 'st-joints', cloud: 'st-cloud', image: 'st-image' };
+  // key: 'robot' | 'joints' | 'cloud' | 'image' | 'markers'
+  const map = {
+    robot: 'st-robot', joints: 'st-joints',
+    cloud: 'st-cloud', image: 'st-image', markers: 'st-markers',
+  };
   const el = document.getElementById(map[key]);
   if (!el) return;
   el.textContent = text;

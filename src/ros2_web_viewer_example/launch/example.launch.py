@@ -45,15 +45,13 @@ def generate_launch_description():
         IncludeLaunchDescription(
             AnyLaunchDescriptionSource([
                 PathJoinSubstitution([
-                    FindPackageShare('ur_description'),
+                    FindPackageShare('ros2_web_viewer_example'),
                     'launch',
-                    'view_ur.launch.xml',
+                    'ur_description.launch.py',
                 ]),
             ]),
             launch_arguments={
                 'ur_type': LaunchConfiguration('ur_type'),
-                # Disable rviz2 — we use ros2_web_viewer instead
-                'launch_rviz': 'false',
             }.items(),
         ),
 
@@ -75,6 +73,15 @@ def generate_launch_description():
             output='screen',
         ),
 
+        # ── Simulated MarkerArray ────────────────────────────────────────
+
+        Node(
+            package='ros2_web_viewer_example',
+            executable='marker_sim',
+            name='marker_sim',
+            output='screen',
+        ),
+
         # ── Web viewer ───────────────────────────────────────────────────
 
         Node(
@@ -87,6 +94,7 @@ def generate_launch_description():
                 'port': LaunchConfiguration('port'),
                 'image_topics': ['/camera/image_raw'],
                 'pointcloud_topics': ['/points'],
+                'marker_array_topics': ['/markers'],
                 'pointcloud_max_points': 5000,
                 'image_jpeg_quality': 65,
             }],

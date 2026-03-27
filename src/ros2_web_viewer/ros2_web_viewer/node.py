@@ -4,12 +4,13 @@ Subscribes to standard robot topics and bridges them to a WebSocket
 stream consumed by the Three.js frontend.
 
 Topics subscribed (all configurable via ROS2 parameters):
-  /robot_description   std_msgs/String        → URDF cached, served via HTTP
-  /joint_states        sensor_msgs/JointState  → JSON message type 'joint_states'
-  /tf                  tf2_msgs/TFMessage      → JSON message type 'tf'
-  /tf_static           tf2_msgs/TFMessage      → JSON message type 'tf' (static=true)
-  <image_topics>       sensor_msgs/Image       → JSON message type 'image' (JPEG base64)
-  <pointcloud_topics>  sensor_msgs/PointCloud2 → JSON message type 'pointcloud' (binary b64)
+  /robot_description      std_msgs/String                  → URDF cached, served via HTTP
+  /joint_states           sensor_msgs/JointState            → JSON message type 'joint_states'
+  /tf                     tf2_msgs/TFMessage                → JSON message type 'tf'
+  /tf_static              tf2_msgs/TFMessage                → JSON message type 'tf' (static=true)
+  <image_topics>          sensor_msgs/Image                 → JSON message type 'image' (JPEG base64)
+  <pointcloud_topics>     sensor_msgs/PointCloud2           → JSON message type 'pointcloud' (binary b64)
+  <marker_array_topics>   visualization_msgs/MarkerArray    → JSON message type 'marker_array'
 
 WebSocket message format  (all JSON):
   { type: 'joint_states', name: [...], position: [...] }
@@ -17,6 +18,9 @@ WebSocket message format  (all JSON):
   { type: 'image',      topic, data: 'data:image/jpeg;base64,...' }
   { type: 'pointcloud', topic, frame_id, count, data: '<base64 packed float32>' }
      data layout: N × [x y z r g b] each a float32 (24 bytes/point)
+  { type: 'marker_array', topic, markers: [{ns, id, type, action, frame_id,
+     px, py, pz, rx, ry, rz, rw, sx, sy, sz, r, g, b, a,
+     text, mesh_resource, points: [[x,y,z],...], colors: [[r,g,b,a],...]},...] }
 """
 
 import base64
@@ -35,6 +39,7 @@ from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import Image, JointState, PointCloud2
 from std_msgs.msg import String
 from tf2_msgs.msg import TFMessage
+from visualization_msgs.msg import MarkerArray
 
 from .pc2_utils import decode_pointcloud2
 from .server import ViewerServer
@@ -84,6 +89,7 @@ class WebViewerNode(Node):
         self.declare_parameter('pointcloud_max_points', 8000)
         self.declare_parameter('image_jpeg_quality', 65)
         self.declare_parameter('target_frame', 'base_link')
+        self.declare_parameter('marker_array_topics', ['/markers'])
 
         # ── Core subscriptions ───────────────────────────────────────────
         self.create_subscription(
@@ -110,6 +116,12 @@ class WebViewerNode(Node):
                 PointCloud2, topic,
                 lambda msg, t=topic: self._on_pointcloud(msg, t), 2)
             self.get_logger().info(f'Subscribed to point cloud topic: {topic}')
+
+        for topic in self.get_parameter('marker_array_topics').value:
+            self.create_subscription(
+                MarkerArray, topic,
+                lambda msg, t=topic: self._on_marker_array(msg, t), 5)
+            self.get_logger().info(f'Subscribed to marker_array topic: {topic}')
 
         self.get_logger().info('ros2_web_viewer node initialised')
 
@@ -192,6 +204,41 @@ class WebViewerNode(Node):
         except Exception as exc:
             self.get_logger().warning(f'PointCloud2 decode error: {exc}',
                                       throttle_duration_sec=5.0)
+
+    def _on_marker_array(self, msg: MarkerArray, topic: str):
+        markers = []
+        for m in msg.markers:
+            markers.append({
+                'ns': m.ns,
+                'id': m.id,
+                'type': m.type,
+                'action': m.action,
+                'frame_id': m.header.frame_id,
+                'px': float(m.pose.position.x),
+                'py': float(m.pose.position.y),
+                'pz': float(m.pose.position.z),
+                'rx': float(m.pose.orientation.x),
+                'ry': float(m.pose.orientation.y),
+                'rz': float(m.pose.orientation.z),
+                'rw': float(m.pose.orientation.w),
+                'sx': float(m.scale.x),
+                'sy': float(m.scale.y),
+                'sz': float(m.scale.z),
+                'r': float(m.color.r),
+                'g': float(m.color.g),
+                'b': float(m.color.b),
+                'a': float(m.color.a),
+                'text': m.text,
+                'mesh_resource': m.mesh_resource,
+                'points': [[float(p.x), float(p.y), float(p.z)] for p in m.points],
+                'colors': [[float(c.r), float(c.g), float(c.b), float(c.a)] for c in m.colors],
+            })
+        payload = {
+            'type': 'marker_array',
+            'topic': topic,
+            'markers': markers,
+        }
+        self._server.broadcast_threadsafe(json.dumps(payload))
 
 
 # ---------------------------------------------------------------------------

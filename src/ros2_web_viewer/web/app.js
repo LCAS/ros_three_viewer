@@ -2,7 +2,7 @@
  * ROS2 Web Viewer — Three.js frontend
  *
  * Features:
- *  • Live URDF parsing with joint-state animation (box/cylinder/sphere geometry + STL meshes)
+ *  • Live URDF parsing with joint-state animation (box/cylinder/sphere geometry + STL/DAE meshes)
  *  • Point cloud with custom GLSL shader (per-point colour, additive glow, distance attenuation)
  *  • Camera image panel
  *  • UnrealBloom post-processing pass for scanner glow
@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import { OrbitControls }   from 'three/addons/controls/OrbitControls.js';
 import { STLLoader }       from 'three/addons/loaders/STLLoader.js';
+import { ColladaLoader }   from 'three/addons/loaders/ColladaLoader.js';
 import { EffectComposer }  from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass }      from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -341,8 +342,9 @@ function createLinkVisuals(linkEl, linkGroup) {
     } else if (tag === 'mesh') {
       const filename = child.getAttribute('filename') || '';
       const url = filename.replace('package://', '/mesh/');
+      const urlLower = url.toLowerCase();
 
-      if (url.toLowerCase().endsWith('.stl')) {
+      if (urlLower.endsWith('.stl')) {
         // Placeholder octahedron while STL loads
         const phMat = robotMaterial(color, 0.05);
         phMat.transparent = true; phMat.opacity = 0.35;
@@ -363,6 +365,35 @@ function createLinkVisuals(linkEl, linkGroup) {
           applyOrigin(realMesh, origin);
           linkGroup.remove(ph);
           linkGroup.add(realMesh);
+        }, undefined, () => { /* silently keep placeholder */ });
+        continue;  // handled async
+
+      } else if (urlLower.endsWith('.dae')) {
+        // Placeholder octahedron while Collada loads
+        const phMat = robotMaterial(color, 0.05);
+        phMat.transparent = true; phMat.opacity = 0.35;
+        const ph = new THREE.Mesh(new THREE.OctahedronGeometry(0.025), phMat);
+        applyOrigin(ph, origin);
+        linkGroup.add(ph);
+
+        const scaleAttr = child.getAttribute('scale');
+        const loader = new ColladaLoader();
+        loader.load(url, (collada) => {
+          const daeScene = collada.scene;
+          if (scaleAttr) {
+            const s = scaleAttr.trim().split(/\s+/).map(Number);
+            daeScene.scale.set(s[0] ?? 1, s[1] ?? 1, s[2] ?? 1);
+          }
+          daeScene.traverse(child => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+              // Keep the DAE's own materials; they carry colour & texture info
+            }
+          });
+          applyOrigin(daeScene, origin);
+          linkGroup.remove(ph);
+          linkGroup.add(daeScene);
         }, undefined, () => { /* silently keep placeholder */ });
         continue;  // handled async
       }

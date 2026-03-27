@@ -169,7 +169,7 @@ const cloudMat = new THREE.ShaderMaterial({
     void main() {
       vColor = aColor;
       vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-      gl_PointSize = uSize * (260.0 / -mvPos.z);
+      gl_PointSize = uSize * (40.0 / -mvPos.z);
       gl_Position  = projectionMatrix * mvPos;
     }
   `,
@@ -181,15 +181,15 @@ const cloudMat = new THREE.ShaderMaterial({
       float r  = dot(uv, uv);
       if (r > 1.0) discard;
 
-      // Soft glowing disc
+      // Tight glowing disc
       float core  = smoothstep(1.0, 0.0, r);
-      float glow  = pow(core, 1.5);
-      float alpha = glow * 0.92;
+      float glow  = pow(core, 6.0);
+      float alpha = glow * 0.95;
 
       gl_FragColor = vec4(vColor * (0.7 + 0.3 * glow), alpha);
     }
   `,
-  uniforms: { uSize: { value: 2.2 } },
+  uniforms: { uSize: { value: 2.0 } },
   vertexColors: false,
   transparent: true,
   depthWrite: false,

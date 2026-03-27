@@ -45,6 +45,8 @@ from .pc2_utils import decode_pointcloud2
 from .server import ViewerServer
 
 log = logging.getLogger('ros2_web_viewer.node')
+log.setLevel(logging.INFO)
+log.addHandler(logging.StreamHandler())
 
 # Latching QoS for robot_description / tf_static
 _LATCHING_QOS = QoSProfile(
@@ -65,10 +67,13 @@ def _find_web_dir() -> str:
         share = get_package_share_directory('ros2_web_viewer')
         candidate = os.path.join(share, 'web')
         if os.path.isdir(candidate):
+            log.info(f'Web assets found in package share directory: {candidate}')
             return candidate
     except Exception:
+        log.warning('ros2_web_viewer package not found; attempting to locate web assets from source tree')
         pass
     # Running from source tree
+    log.warning('ros2_web_viewer running from source; web assets may not be found')
     return str(Path(__file__).parent.parent / 'web')
 
 

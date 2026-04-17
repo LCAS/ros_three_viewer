@@ -14,7 +14,8 @@ setup(
         ('share/' + package_name + '/launch', glob('launch/*.py')),
         ('share/' + package_name + '/config', glob('config/*.yaml')),
         # Web assets
-        ('share/' + package_name + '/web', glob('web/*')),
+        ('share/' + package_name + '/web', glob('web/*.*')),
+        ('share/' + package_name + '/web/assets', glob('web/assets/*')),
     ],
     install_requires=[
         'setuptools',

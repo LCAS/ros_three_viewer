@@ -10,7 +10,17 @@ This repository contains the **`ros2_web_viewer`** ROS2 package — a web-based 
 - Point cloud visualisation with viridis colourmap and GLSL glow shader
 - Camera image stream (JPEG-compressed bridge)
 - Auto-reconnecting WebSocket client
-- UnrealBloom post-processing pass for a sci-fi aesthetic
+- Chelsea Flower Show botanical theme (warm earth palette, Playfair Display serif font)
+
+### Customising the Background Image
+
+The web UI supports a `web/assets/background.jpg` botanical wallpaper overlay. To enable it:
+
+1. Download (or supply) your background image.
+2. Save it to `src/ros2_web_viewer/web/assets/background.jpg`.
+3. Rebuild the package (`colcon build --packages-select ros2_web_viewer`).
+
+If the file is absent the CSS gradient fallback renders a matching warm parchment texture.
 
 ### Getting Started
 

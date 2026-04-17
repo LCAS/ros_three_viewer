@@ -24,6 +24,7 @@ setup(
         'console_scripts': [
             'pointcloud_sim = ros2_web_viewer_example.pointcloud_sim:main',
             'image_sim = ros2_web_viewer_example.image_sim:main',
+            'marker_sim = ros2_web_viewer_example.marker_sim:main',
         ],
     },
 )

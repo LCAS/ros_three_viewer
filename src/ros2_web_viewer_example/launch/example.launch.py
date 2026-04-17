@@ -16,6 +16,7 @@ Open http://localhost:8080 in a browser once everything is running.
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
 from launch.launch_description_sources import AnyLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
@@ -40,20 +41,30 @@ def generate_launch_description():
             'port', default_value='8080',
             description='Web server port'),
 
+        DeclareLaunchArgument(
+            'enable_pointcloud_sim', default_value='false',
+            description='Launch the simulated point cloud publisher'),
+
+        DeclareLaunchArgument(
+            'enable_image_sim', default_value='false',
+            description='Launch the simulated camera image publisher'),
+
+        DeclareLaunchArgument(
+            'enable_marker_sim', default_value='false',
+            description='Launch the simulated MarkerArray publisher'),
+
         # ── UR3e robot description + joint_state_publisher ───────────────
 
         IncludeLaunchDescription(
             AnyLaunchDescriptionSource([
                 PathJoinSubstitution([
-                    FindPackageShare('ur_description'),
+                    FindPackageShare('ros2_web_viewer_example'),
                     'launch',
-                    'view_ur.launch.py',
+                    'ur_description.launch.py',
                 ]),
             ]),
             launch_arguments={
                 'ur_type': LaunchConfiguration('ur_type'),
-                # Disable rviz2 — we use ros2_web_viewer instead
-                'launch_rviz': 'false',
             }.items(),
         ),
 
@@ -64,6 +75,7 @@ def generate_launch_description():
             executable='pointcloud_sim',
             name='pointcloud_sim',
             output='screen',
+            condition=IfCondition(LaunchConfiguration('enable_pointcloud_sim')),
         ),
 
         # ── Simulated camera image ───────────────────────────────────────
@@ -73,6 +85,17 @@ def generate_launch_description():
             executable='image_sim',
             name='image_sim',
             output='screen',
+            condition=IfCondition(LaunchConfiguration('enable_image_sim')),
+        ),
+
+        # ── Simulated MarkerArray ────────────────────────────────────────
+
+        Node(
+            package='ros2_web_viewer_example',
+            executable='marker_sim',
+            name='marker_sim',
+            output='screen',
+            condition=IfCondition(LaunchConfiguration('enable_marker_sim')),
         ),
 
         # ── Web viewer ───────────────────────────────────────────────────
@@ -87,6 +110,7 @@ def generate_launch_description():
                 'port': LaunchConfiguration('port'),
                 'image_topics': ['/camera/image_raw'],
                 'pointcloud_topics': ['/points'],
+                'marker_array_topics': ['/markers'],
                 'pointcloud_max_points': 5000,
                 'image_jpeg_quality': 65,
             }],

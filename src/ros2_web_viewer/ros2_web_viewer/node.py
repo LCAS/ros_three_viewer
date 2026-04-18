@@ -181,8 +181,16 @@ class WebViewerNode(Node):
                 f'Using URDF link blacklist ({len(self._urdf_link_blacklist)}): {self._urdf_link_blacklist}')
 
     def _resolve_string_list_parameter(self, name: str) -> list[str]:
-        """Return a normalised list[str] from a ROS parameter value."""
-        raw = self.get_parameter(name).value
+        """Return a normalised list[str] from a ROS parameter value.
+        
+        Returns empty list if parameter is not yet initialized (e.g., when loading from file).
+        """
+        try:
+            raw = self.get_parameter(name).value
+        except rclpy.exceptions.ParameterUninitializedException:
+            # Parameter not yet initialized from parameter file; use empty list default
+            return []
+
         items: list[str] = []
         if isinstance(raw, (list, tuple, set)):
             items = [str(v).strip() for v in raw]
@@ -268,9 +276,18 @@ class WebViewerNode(Node):
         """Pick fixed frame with precedence fixed_frame > target_frame > base_link.
 
         Leading slashes are stripped to normalise TF frame IDs.
+        Returns default 'base_link' if parameters are not yet initialized.
         """
-        fixed_frame = str(self.get_parameter('fixed_frame').value or '').strip()
-        target_frame = str(self.get_parameter('target_frame').value or '').strip()
+        try:
+            fixed_frame = str(self.get_parameter('fixed_frame').value or '').strip()
+        except rclpy.exceptions.ParameterUninitializedException:
+            fixed_frame = ''
+
+        try:
+            target_frame = str(self.get_parameter('target_frame').value or '').strip()
+        except rclpy.exceptions.ParameterUninitializedException:
+            target_frame = ''
+
         selected = fixed_frame or target_frame or 'base_link'
         return selected.lstrip('/')
 

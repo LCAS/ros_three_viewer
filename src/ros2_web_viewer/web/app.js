@@ -39,13 +39,13 @@ const htmlTopicLabel = document.getElementById('html-topic-label');
 const renderer = new THREE.WebGLRenderer({
   canvas,
   antialias: true,
-  powerPreference: 'high-performance',
+  powerPreference: 'default',
 });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = false;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 function getCanvasSize() {
@@ -61,7 +61,7 @@ function getCanvasSize() {
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1e1408);
-scene.fog = new THREE.FogExp2(0x1e1408, 0.05);
+//scene.fog = new THREE.FogExp2(0x1e1408, 0.05);
 
 // ROS (X forward, Y left, Z up) → Three (X right, Y up, Z out) basis change
 const ROS_TO_THREE_QUAT = new THREE.Quaternion()

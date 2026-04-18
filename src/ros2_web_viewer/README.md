@@ -38,20 +38,20 @@ source install/setup.bash
 ## Run
 
 ```bash
-# Minimal — uses defaults
-ros2 run ros2_web_viewer ros2_web_viewer
-
-# With launch file
+# Minimal — uses defaults from config/params.yaml
 ros2 launch ros2_web_viewer viewer.launch.py
 
-# Override topics
-ros2 launch ros2_web_viewer viewer.launch.py \
-    image_topics:="['/realsense/color/image_raw']" \
-    pointcloud_topics:="['/realsense/depth/color/points']" \
-    html_panel_topic:=/viewer_panel_html \
-  urdf_link_whitelist:="['base_link','shoulder_link','upper_arm_link']" \
-    fixed_frame:=base_link \
-    port:=8080
+# With custom parameter file
+ros2 launch ros2_web_viewer viewer.launch.py params_file:=path/to/custom_params.yaml
+
+# PhenAIx-specific defaults (with phenaix_params.yaml)
+ros2 launch ros2_web_viewer phenaix.launch.py
+
+# Override parameter file at PhenAIx launch
+ros2 launch ros2_web_viewer phenaix.launch.py params_file:=path/to/custom_params.yaml
+
+# Direct node execution (uses default parameters in code)
+ros2 run ros2_web_viewer ros2_web_viewer
 ```
 
 Then open **http://localhost:8080** in a browser.
@@ -70,22 +70,41 @@ Then open **http://localhost:8080** in a browser.
 
 ## Parameters
 
+Parameters are configured via YAML files (primary method):
+- **Default file:** [config/params.yaml](config/params.yaml) — generic defaults
+- **PhenAIx defaults:** [config/phenaix_params.yaml](config/phenaix_params.yaml) — project-specific overrides
+- **Custom override:** Pass `params_file:=path/to/your_params.yaml` at launch time
+
+Alternatively, override individual parameters at runtime:
+```bash
+ros2 launch ros2_web_viewer viewer.launch.py params_file:=custom.yaml
+ros2 run ros2_web_viewer ros2_web_viewer --ros-args -p port:=9090
+```
+
+See [config/params.yaml](config/params.yaml) for the complete, well-documented parameter reference with inline explanations.
+
+### Quick parameter reference
+
+For a complete, well-documented list of all parameters with explanations, see [config/params.yaml](config/params.yaml).
+
 | Parameter | Default | Description |
 |---|---|---|
-| `host` | `0.0.0.0` | Bind address |
-| `port` | `8080` | HTTP/WS port |
-| `image_topics` | `['/camera/image_raw']` | Image topics to bridge |
-| `pointcloud_topics` | `['/points']` | Point cloud topics |
+| `host` | `0.0.0.0` | HTTP/WebSocket bind address |
+| `port` | `8080` | HTTP/WebSocket port |
+| `image_topics` | `['/camera/image_raw']` | `sensor_msgs/Image` topics to bridge |
+| `pointcloud_topics` | `['/points']` | `sensor_msgs/PointCloud2` topics to render |
+| `marker_array_topics` | `['/markers']` | `visualization_msgs/MarkerArray` topics to render |
 | `pointcloud_max_points` | `8000` | Cloud downsampling limit |
 | `image_jpeg_quality` | `65` | JPEG quality (1–100) |
 | `html_panel_topic` | `/viewer_panel_html` | `std_msgs/String` source for right-side HTML panel |
-| `fixed_frame` | `base_link` | TF frame used as world/fixed frame (RViz-style) |
-| `urdf_link_whitelist` | `[]` | Links to render. If non-empty, only these links are displayed |
-| `urdf_link_blacklist` | `[]` | Links to hide when whitelist is empty |
+| `fixed_frame` | `base_link` | TF frame used as world origin (RViz-style) |
+| `target_frame` | `base_link` | Fallback TF frame if `fixed_frame` not set |
+| `urdf_link_whitelist` | `[]` | URDF links to display (precedence over blacklist) |
+| `urdf_link_blacklist` | `[]` | URDF links to hide (ignored if whitelist non-empty) |
 
-`html_panel_topic` content is rendered in a dedicated panel on the page. It uses the browser Sanitizer API when available (with a safe plain-text fallback).
+**URDF filtering precedence:** whitelist (if non-empty) > blacklist (if non-empty) > no filtering.
 
-URDF filtering precedence: whitelist > blacklist > no filtering.
+`html_panel_topic` content is rendered in a dedicated panel. It uses the browser Sanitizer API when available (with a safe plain-text fallback).
 
 ## Quick Test (without a real robot)
 
@@ -105,11 +124,11 @@ ros2 topic pub /viewer_panel_html std_msgs/String \
 
 ## Customisation
 
+- **Topics & rendering** — edit [config/params.yaml](config/params.yaml)
+- **PhenAIx defaults** — edit [config/phenaix_params.yaml](config/phenaix_params.yaml)
 - **Colours / theme** — edit CSS variables in `web/style.css` (`:root` block)
 - **Title / branding** — edit `web/index.html` (`#logo`, `#tagline`)
 - **Bloom strength** — edit `bloomPass` parameters in `web/app.js`
-- **Point cloud max** — `pointcloud_max_points` ROS2 parameter
-- **Add topics** — extend `image_topics` or `pointcloud_topics` parameter lists
 
 ## Architecture
 

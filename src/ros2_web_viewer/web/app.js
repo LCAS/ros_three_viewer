@@ -1029,26 +1029,73 @@ function updateImage(dataUri, topic) {
   setStatus('image', topic, 'ok');
 }
 
-function sanitizeHtml(html) {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  for (const el of doc.querySelectorAll('script, iframe, object, embed')) {
-    el.remove();
+function isSafeUrl(url) {
+  const value = String(url || '').trim();
+  if (!value) return false;
+  const lower = value.toLowerCase();
+  if (lower.startsWith('javascript:') || lower.startsWith('vbscript:') || lower.startsWith('data:')) {
+    return false;
   }
-  for (const el of doc.querySelectorAll('*')) {
-    for (const attr of [...el.attributes]) {
-      const name = attr.name.toLowerCase();
-      const value = String(attr.value || '').trim().toLowerCase();
-      if (name.startsWith('on')) el.removeAttribute(attr.name);
-      if ((name === 'href' || name === 'src') && value.startsWith('javascript:')) {
-        el.removeAttribute(attr.name);
-      }
+  return true;
+}
+
+function buildSanitizedContent(html) {
+  const allowedTags = new Set([
+    'DIV', 'P', 'SPAN', 'STRONG', 'EM', 'B', 'I', 'U',
+    'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+    'UL', 'OL', 'LI', 'BR', 'HR',
+    'CODE', 'PRE', 'BLOCKQUOTE',
+    'A',
+  ]);
+  const globalAttrs = new Set(['class', 'title', 'role']);
+  const tagAttrs = {
+    A: new Set(['href', 'target', 'rel']),
+  };
+
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+
+  const sanitizeNode = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return document.createTextNode(node.textContent || '');
     }
-  }
-  return doc.body.innerHTML;
+    if (node.nodeType !== Node.ELEMENT_NODE) return document.createDocumentFragment();
+
+    const tag = node.tagName.toUpperCase();
+    const childNodes = [...node.childNodes].map(sanitizeNode);
+
+    if (!allowedTags.has(tag)) {
+      const frag = document.createDocumentFragment();
+      childNodes.forEach(child => frag.appendChild(child));
+      return frag;
+    }
+
+    const safeEl = document.createElement(tag.toLowerCase());
+    for (const attr of [...node.attributes]) {
+      const name = attr.name.toLowerCase();
+      if (name.startsWith('on')) continue;
+
+      const isAllowed = globalAttrs.has(name) || tagAttrs[tag]?.has(name);
+      if (!isAllowed) continue;
+
+      if ((name === 'href' || name === 'src') && !isSafeUrl(attr.value)) continue;
+      safeEl.setAttribute(name, attr.value);
+    }
+
+    if (tag === 'A' && safeEl.getAttribute('target') === '_blank') {
+      safeEl.setAttribute('rel', 'noopener noreferrer');
+    }
+
+    childNodes.forEach(child => safeEl.appendChild(child));
+    return safeEl;
+  };
+
+  const fragment = document.createDocumentFragment();
+  [...parsed.body.childNodes].forEach(node => fragment.appendChild(sanitizeNode(node)));
+  return fragment;
 }
 
 function updateHtmlPanel(html, topic) {
-  htmlPanelContent.innerHTML = sanitizeHtml(html);
+  htmlPanelContent.replaceChildren(buildSanitizedContent(html));
   htmlTopicLabel.textContent = topic.split('/').pop();
   setStatus('html', topic, 'ok');
 }

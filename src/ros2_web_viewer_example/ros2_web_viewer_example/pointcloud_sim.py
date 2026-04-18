@@ -71,8 +71,8 @@ class PointCloudSimNode(Node):
 
     def __init__(self):
         super().__init__('pointcloud_sim')
-        self.declare_parameter('frame_id', 'base_link')
-        self.declare_parameter('publish_rate', 10.0)
+        self.declare_parameter('frame_id', 'tool0')
+        self.declare_parameter('publish_rate', 0.33)
 
         self._pub = self.create_publisher(PointCloud2, '/points', 5)
         rate = self.get_parameter('publish_rate').value

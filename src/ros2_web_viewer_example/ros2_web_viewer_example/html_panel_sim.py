@@ -16,7 +16,7 @@ class HtmlPanelSimNode(Node):
 
     def __init__(self):
         super().__init__('html_panel_sim')
-        self.declare_parameter('publish_rate', 1.0)
+        self.declare_parameter('publish_rate', 0.2)
 
         self._pub = self.create_publisher(String, '/viewer_panel_html', 5)
         rate = self.get_parameter('publish_rate').value

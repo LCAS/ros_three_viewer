@@ -86,7 +86,7 @@ controls.dampingFactor = 0.06;
 controls.minDistance = 0.1;
 controls.maxDistance = 20;
 controls.autoRotate = true;
-controls.autoRotateSpeed = 0.35;
+controls.autoRotateSpeed = 0.75;
 controls.update();
 
 // ─────────────────────────────────────────────────────────────────────────────

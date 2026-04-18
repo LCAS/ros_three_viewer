@@ -52,8 +52,8 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 // ─────────────────────────────────────────────────────────────────────────────
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x030a10);
-scene.fog = new THREE.FogExp2(0x030a10, 0.07);
+scene.background = new THREE.Color(0x1e1408);
+scene.fog = new THREE.FogExp2(0x1e1408, 0.05);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Camera & controls
@@ -83,7 +83,7 @@ composer.addPass(new RenderPass(scene, camera));
 
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  /*strength*/ 0.55, /*radius*/ 0.45, /*threshold*/ 0.78);
+  /*strength*/ 0.25, /*radius*/ 0.5, /*threshold*/ 0.88);
 composer.addPass(bloomPass);
 
 const outputPass = new OutputPass();
@@ -93,9 +93,9 @@ composer.addPass(outputPass);
 // Lighting
 // ─────────────────────────────────────────────────────────────────────────────
 
-scene.add(new THREE.AmbientLight(0x102545, 0.7));
+scene.add(new THREE.AmbientLight(0xd4c090, 0.5));
 
-const keyLight = new THREE.DirectionalLight(0xddeeff, 2.8);
+const keyLight = new THREE.DirectionalLight(0xfff5e0, 2.0);
 keyLight.position.set(3, 5, 2);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(1024, 1024);
@@ -103,24 +103,24 @@ keyLight.shadow.camera.near = 0.1;
 keyLight.shadow.camera.far = 20;
 scene.add(keyLight);
 
-const fillLight = new THREE.PointLight(0x00c896, 2.5, 10);
+const fillLight = new THREE.PointLight(0x8ab870, 1.8, 10);
 fillLight.position.set(-2.5, 1.5, -1);
 scene.add(fillLight);
 
-const rimLight = new THREE.PointLight(0xf5a623, 1.2, 8);
+const rimLight = new THREE.PointLight(0xe0c060, 1.0, 8);
 rimLight.position.set(1, 3, -3);
 scene.add(rimLight);
 
-scene.add(new THREE.HemisphereLight(0x1a3050, 0x080808, 0.6));
+scene.add(new THREE.HemisphereLight(0xd4c8a0, 0x2a1e10, 0.5));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Scene decorations
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Grid
-const gridHelper = new THREE.GridHelper(10, 30, 0x003355, 0x001122);
+const gridHelper = new THREE.GridHelper(10, 30, 0x4a4133, 0x30281e);
 gridHelper.material.transparent = true;
-gridHelper.material.opacity = 0.55;
+gridHelper.material.opacity = 0.5;
 scene.add(gridHelper);
 
 // Ground plane (shadow receiver)

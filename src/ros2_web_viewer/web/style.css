@@ -1,29 +1,28 @@
 /* ============================================================
-   ROS2 Web Viewer — "Biopunk Scanner" theme
-   Palette: deep navy bg · teal primary · amber accent · frost text
+   ROS2 Web Viewer — "Chelsea Flower Show" theme
+   Palette: parchment cream · warm brown · dark earth
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=Rajdhani:wght@300;400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400;700&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
 
 /* ── Reset & base ─────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:          #030a10;
-  --bg2:         #050f18;
-  --panel-bg:    rgba(4, 18, 30, 0.82);
-  --panel-border: rgba(0, 210, 170, 0.25);
-  --teal:        #00d2aa;
-  --teal-dim:    #008a70;
-  --amber:       #f5a623;
-  --blue:        #1a8cff;
-  --frost:       #c8e8f0;
-  --frost-dim:   #7aaabb;
-  --danger:      #ff4466;
-  --good:        #00d2aa;
-  --warn:        #f5a623;
+  --bg:          #30281e;
+  --bg2:         #3a2f22;
+  --panel-bg:    rgba(48, 40, 30, 0.88);
+  --panel-border: rgba(224, 220, 169, 0.20);
+  --cream:       #e0dca9;
+  --cream-dim:   #b5b08a;
+  --brown:       #4a4133;
+  --brown-light: #6b5d4a;
+  --danger:      #c0654a;
+  --good:        #7aaa6a;
+  --warn:        #c9a84c;
   --mono:        'IBM Plex Mono', monospace;
-  --sans:        'Rajdhani', sans-serif;
+  --sans:        'Lato', sans-serif;
+  --serif:       'Playfair Display', serif;
   --panel-blur:  blur(12px);
 }
 
@@ -31,7 +30,7 @@ html, body {
   width: 100%; height: 100%;
   overflow: hidden;
   background: var(--bg);
-  color: var(--frost);
+  color: var(--cream);
   font-family: var(--sans);
 }
 
@@ -43,37 +42,21 @@ html, body {
   display: block;
 }
 
-/* ── Scan-line overlay ────────────────────────────────────── */
-#scanlines {
+/* ── Background wallpaper ─────────────────────────────────── */
+#bg-wallpaper {
   position: fixed;
   inset: 0;
+  background-color: #d8d0a8;
+  background-image:
+    url('assets/background.jpg'),
+    radial-gradient(ellipse 120% 80% at 10% 90%, rgba(74,65,51,0.35) 0%, transparent 60%),
+    radial-gradient(ellipse 80% 120% at 90% 85%, rgba(100,120,80,0.25) 0%, transparent 55%),
+    url('assets/noise.svg');
+  background-size: cover, cover, cover, 300px 300px;
+  background-position: center, center, center, 0 0;
+  opacity: 0.12;
   pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0,0,0,0.04) 2px,
-    rgba(0,0,0,0.04) 4px
-  );
-  z-index: 10;
-}
-
-/* ── Sweep animation ─────────────────────────────────────── */
-#sweep {
-  position: fixed;
-  left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--teal), transparent);
-  opacity: 0.4;
-  z-index: 11;
-  animation: sweep 6s ease-in-out infinite;
-  pointer-events: none;
-}
-@keyframes sweep {
-  0%   { top: -2px; opacity: 0; }
-  5%   { opacity: 0.4; }
-  95%  { opacity: 0.3; }
-  100% { top: 100%; opacity: 0; }
+  z-index: 8;
 }
 
 /* ── Vignette ────────────────────────────────────────────── */
@@ -82,7 +65,7 @@ html, body {
   inset: 0;
   background: radial-gradient(ellipse at center,
     transparent 50%,
-    rgba(0,0,0,0.7) 100%);
+    rgba(30, 20, 10, 0.6) 100%);
   pointer-events: none;
   z-index: 9;
 }
@@ -92,31 +75,31 @@ html, body {
   position: fixed;
   top: 0; left: 0; right: 0;
   height: 52px;
-  background: linear-gradient(180deg, rgba(3,10,16,0.95) 0%, transparent 100%);
+  background: linear-gradient(180deg, rgba(48,40,30,0.95) 0%, transparent 100%);
   display: flex;
   align-items: center;
   padding: 0 20px;
   z-index: 20;
   gap: 16px;
-  border-bottom: 1px solid rgba(0,210,170,0.12);
+  border-bottom: 1px solid rgba(224,220,169,0.12);
 }
 
 #logo {
-  font-family: var(--sans);
+  font-family: var(--serif);
   font-weight: 700;
   font-size: 1.5rem;
-  letter-spacing: 0.08em;
-  color: var(--teal);
-  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cream);
   white-space: nowrap;
 }
-#logo span { color: var(--amber); }
+#logo span { color: var(--cream-dim); font-style: italic; }
 
 #tagline {
-  font-family: var(--mono);
+  font-family: var(--sans);
+  font-weight: 300;
   font-size: 0.65rem;
-  color: var(--frost-dim);
-  letter-spacing: 0.12em;
+  color: var(--cream-dim);
+  letter-spacing: 0.15em;
   text-transform: uppercase;
 }
 
@@ -133,7 +116,7 @@ html, body {
   font-family: var(--mono);
   font-size: 0.65rem;
   letter-spacing: 0.08em;
-  color: var(--frost-dim);
+  color: var(--cream-dim);
   backdrop-filter: var(--panel-blur);
 }
 #ws-dot {
@@ -168,13 +151,13 @@ html, body {
   font-size: 0.6rem;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: var(--teal);
+  color: var(--cream);
 }
 #status-header::before {
   content: '';
   display: block;
   width: 2px; height: 12px;
-  background: var(--teal);
+  background: var(--cream);
   border-radius: 1px;
 }
 
@@ -185,25 +168,25 @@ html, body {
   padding: 5px 12px;
   font-family: var(--mono);
   font-size: 0.62rem;
-  border-bottom: 1px solid rgba(0,210,170,0.06);
+  border-bottom: 1px solid rgba(224,220,169,0.06);
 }
 .status-row:last-child { border-bottom: none; }
 
 .status-label {
-  color: var(--frost-dim);
+  color: var(--cream-dim);
   flex-shrink: 0;
   width: 60px;
   letter-spacing: 0.06em;
 }
 .status-value {
-  color: var(--frost);
+  color: var(--cream);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .status-value.ok   { color: var(--good); }
-.status-value.warn { color: var(--amber); }
+.status-value.warn { color: var(--warn); }
 .status-value.bad  { color: var(--danger); }
 
 /* ── Right-side image panel ──────────────────────────────── */
@@ -235,7 +218,7 @@ html, body {
   font-size: 0.6rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--amber);
+  color: var(--cream-dim);
 }
 
 #camera-image {
@@ -243,7 +226,7 @@ html, body {
   width: 100%;
   aspect-ratio: 4/3;
   object-fit: cover;
-  background: #030a10;
+  background: var(--bg);
 }
 #image-placeholder {
   display: flex;
@@ -254,7 +237,7 @@ html, body {
   font-family: var(--mono);
   font-size: 0.6rem;
   letter-spacing: 0.1em;
-  color: var(--frost-dim);
+  color: var(--cream-dim);
   opacity: 0.5;
 }
 
@@ -264,12 +247,12 @@ html, body {
   width: 40px; height: 40px;
   z-index: 15;
   pointer-events: none;
-  opacity: 0.4;
+  opacity: 0.3;
 }
 .corner::before, .corner::after {
   content: '';
   position: absolute;
-  background: var(--teal);
+  background: var(--cream);
 }
 .corner::before { width: 2px; height: 20px; }
 .corner::after  { width: 20px; height: 2px; }
@@ -306,28 +289,27 @@ html, body {
 #loading.fade-out { opacity: 0; pointer-events: none; }
 
 #loading-title {
-  font-family: var(--sans);
+  font-family: var(--serif);
   font-weight: 700;
   font-size: 2rem;
-  letter-spacing: 0.1em;
-  color: var(--teal);
-  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cream);
 }
-#loading-title span { color: var(--amber); }
+#loading-title span { color: var(--cream-dim); font-style: italic; }
 
 #loading-bar-wrap {
   width: 200px;
   height: 2px;
-  background: rgba(0,210,170,0.15);
+  background: rgba(224,220,169,0.15);
   border-radius: 1px;
   overflow: hidden;
 }
 #loading-bar {
   height: 100%;
   width: 0%;
-  background: var(--teal);
+  background: var(--cream);
   animation: load-fill 1.8s ease-in-out forwards;
-  box-shadow: 0 0 8px var(--teal);
+  box-shadow: 0 0 8px rgba(224,220,169,0.4);
 }
 @keyframes load-fill {
   0%   { width: 0%; }
@@ -339,7 +321,7 @@ html, body {
   font-family: var(--mono);
   font-size: 0.65rem;
   letter-spacing: 0.15em;
-  color: var(--frost-dim);
+  color: var(--cream-dim);
   text-transform: uppercase;
   animation: blink 1.2s ease-in-out infinite;
 }
@@ -353,7 +335,7 @@ html, body {
   position: absolute;
   font-family: var(--mono);
   font-size: 0.6rem;
-  color: var(--teal);
+  color: var(--cream);
   letter-spacing: 0.08em;
   pointer-events: none;
   white-space: nowrap;
@@ -362,4 +344,4 @@ html, body {
 /* ── Scrollbar ───────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: var(--bg2); }
-::-webkit-scrollbar-thumb { background: var(--teal-dim); border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: var(--cream-dim); border-radius: 2px; }

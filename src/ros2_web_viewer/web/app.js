@@ -407,6 +407,7 @@ function createLinkVisuals(linkEl, linkGroup) {
           }
           daeScene.traverse(child => {
             if (child.isMesh) {
+              child.rotation.x += Math.PI / 2;
               child.castShadow = true;
               child.receiveShadow = true;
               // Keep the DAE's own materials; they carry colour & texture info

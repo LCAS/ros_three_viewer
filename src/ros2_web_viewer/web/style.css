@@ -88,7 +88,7 @@ html, body {
     url('assets/noise.svg');
   background-size: cover, cover, cover, 300px 300px;
   background-position: center, center, center, 0 0;
-  opacity: 0.12;
+  opacity: 0.20;
   pointer-events: none;
   z-index: 8;
 }

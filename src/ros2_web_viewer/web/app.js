@@ -1032,11 +1032,16 @@ function updateImage(dataUri, topic) {
 function isSafeUrl(url) {
   const value = String(url || '').trim();
   if (!value) return false;
-  const lower = value.toLowerCase();
-  if (lower.startsWith('javascript:') || lower.startsWith('vbscript:') || lower.startsWith('data:')) {
+  if (value.startsWith('#') || value.startsWith('/') || value.startsWith('./') || value.startsWith('../')) {
+    return true;
+  }
+  try {
+    const parsed = new URL(value, window.location.origin);
+    const allowedProtocols = new Set(['http:', 'https:', 'mailto:', 'tel:']);
+    return allowedProtocols.has(parsed.protocol);
+  } catch {
     return false;
   }
-  return true;
 }
 
 const panelSanitizerConfig = {
@@ -1062,9 +1067,8 @@ function normalizePanelLinks(root) {
       link.removeAttribute('rel');
       continue;
     }
-    if (link.getAttribute('target') === '_blank') {
-      link.setAttribute('rel', 'noopener noreferrer');
-    }
+    link.setAttribute('target', '_blank');
+    link.setAttribute('rel', 'noopener noreferrer');
   }
 }
 
@@ -1075,7 +1079,7 @@ function updateHtmlPanel(html, topic) {
     htmlPanelContent.setHTML(rawHtml, { sanitizer });
     normalizePanelLinks(htmlPanelContent);
   } else {
-    // Safe fallback for browsers without Sanitizer API support.
+    // Degraded fallback for browsers without Sanitizer API support.
     htmlPanelContent.textContent = rawHtml;
   }
   htmlTopicLabel.textContent = topic.split('/').pop();

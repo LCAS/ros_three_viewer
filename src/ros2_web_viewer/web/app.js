@@ -217,6 +217,8 @@ const pointCloud = new THREE.Points(cloudGeo, cloudMat);
 pointCloud.frustumCulled = false;
 rosSceneRoot.add(pointCloud);
 
+let pointCloudFrameId = '';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Viridis colourmap (JS-side, for any unmapped points)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -267,10 +269,20 @@ function updatePointCloud(b64, count, frameId) {
   cloudGeo.attributes.position.needsUpdate = true;
   cloudGeo.attributes.aColor.needsUpdate   = true;
 
-  const frameMat = getFrameMatrixInFixedFrame(frameId);
+  pointCloudFrameId = normalizeFrameId(frameId);
+  updatePointCloudPoseFromTF();
+}
+
+function updatePointCloudPoseFromTF() {
+  const frameMat = getFrameMatrixInFixedFrame(pointCloudFrameId, 'pointcloud');
   if (frameMat) {
+    clearTfWarning(`pointcloud-fallback:${pointCloudFrameId || 'empty'}`);
     frameMat.decompose(pointCloud.position, pointCloud.quaternion, pointCloud.scale);
   } else {
+    warnTfOnce(
+      `pointcloud-fallback:${pointCloudFrameId || 'empty'}`,
+      `[TF] Point cloud pose fallback to identity because transform lookup failed for frame "${pointCloudFrameId || '<empty>'}"`,
+    );
     pointCloud.position.set(0, 0, 0);
     pointCloud.quaternion.identity();
     pointCloud.scale.set(1, 1, 1);
@@ -563,6 +575,17 @@ function applyJointStates(names, positions) {
 const tfTree = {};  // frame_id → { parent, tx, ty, tz, rx, ry, rz, rw }
 let fixedFrame = 'base_link';
 let fixedFrameLocked = false;
+const tfWarningKeys = new Set();
+
+function warnTfOnce(key, message) {
+  if (tfWarningKeys.has(key)) return;
+  tfWarningKeys.add(key);
+  console.warn(message);
+}
+
+function clearTfWarning(key) {
+  tfWarningKeys.delete(key);
+}
 
 function normalizeFrameId(frameId) {
   return (frameId || '').trim().replace(/^\/+/, '');
@@ -590,6 +613,7 @@ function applyTF(transforms, _static, fixedFrameFromMsg) {
     };
   }
   updateRobotPoseFromTF();
+  updatePointCloudPoseFromTF();
 }
 
 function getFrameToRootMatrix(frameId) {
@@ -613,10 +637,39 @@ function getFrameToRootMatrix(frameId) {
   return mat;
 }
 
-function getFrameMatrixInFixedFrame(frameId) {
+function getRootFrameId(frameId) {
+  let f = normalizeFrameId(frameId);
+  const visited = new Set();
+  while (f && tfTree[f] && !visited.has(f)) {
+    visited.add(f);
+    f = tfTree[f].parent;
+  }
+  return f;
+}
+
+function getFrameMatrixInFixedFrame(frameId, consumer = 'unknown') {
   const f = normalizeFrameId(frameId);
-  if (!f || f === fixedFrame) return new THREE.Matrix4();
-  if (!tfTree[f]) return null;
+  if (!f) {
+    warnTfOnce(
+      `empty:${consumer}`,
+      `[TF] Cannot resolve transform for ${consumer}: empty frame_id`,
+    );
+    return null;
+  }
+  if (f === fixedFrame) {
+    clearTfWarning(`disconnected:${consumer}:${f}:${fixedFrame}`);
+    return new THREE.Matrix4();
+  }
+  const fixedRoot = getRootFrameId(fixedFrame);
+  const frameRoot = getRootFrameId(f);
+  if (fixedRoot && frameRoot && fixedRoot !== frameRoot) {
+    warnTfOnce(
+      `disconnected:${consumer}:${f}:${fixedFrame}`,
+      `[TF] Cannot resolve transform for ${consumer}: frame "${f}" is in tree rooted at "${frameRoot}", but fixed_frame is "${fixedFrame}" rooted at "${fixedRoot}"`,
+    );
+    return null;
+  }
+  clearTfWarning(`disconnected:${consumer}:${f}:${fixedFrame}`);
   const rootToFixed = getFrameToRootMatrix(fixedFrame);
   const rootToFrame = getFrameToRootMatrix(f);
   return rootToFixed.clone().invert().multiply(rootToFrame);
@@ -624,7 +677,7 @@ function getFrameMatrixInFixedFrame(frameId) {
 
 function updateRobotPoseFromTF() {
   if (!robotLoaded) return;
-  const frameMat = getFrameMatrixInFixedFrame(robotBaseFrame);
+  const frameMat = getFrameMatrixInFixedFrame(robotBaseFrame, 'robot');
   if (!frameMat) {
     robotRoot.position.set(0, 0, 0);
     robotRoot.quaternion.identity();
@@ -655,7 +708,7 @@ const markerObjects = new Map();
 
 // Walk TF chain to compute world-space matrix of a named frame
 function getFrameWorldMatrix(frameId) {
-  return getFrameMatrixInFixedFrame(frameId) || new THREE.Matrix4();
+  return getFrameMatrixInFixedFrame(frameId, 'marker') || new THREE.Matrix4();
 }
 
 // Standard MeshStandardMaterial for markers

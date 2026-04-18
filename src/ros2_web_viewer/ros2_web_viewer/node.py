@@ -89,6 +89,9 @@ class WebViewerNode(Node):
         super().__init__('ros2_web_viewer')
         self._server = server
         self._urdf: str | None = None
+        self._tf_cache_lock = threading.Lock()
+        self._tf_static_cache: dict[str, dict] = {}
+        self._tf_dynamic_cache: dict[str, dict] = {}
 
         # ── Parameters ──────────────────────────────────────────────────
         self.declare_parameter('image_topics', ['/camera/image_raw'])
@@ -100,6 +103,7 @@ class WebViewerNode(Node):
         self.declare_parameter('target_frame', 'base_link')
         self.declare_parameter('marker_array_topics', ['/markers'])
         self._fixed_frame = self._resolve_fixed_frame()
+        self._server.set_client_init_messages_getter(self._get_ws_init_messages)
 
         # ── Core subscriptions ───────────────────────────────────────────
         self.create_subscription(
@@ -186,6 +190,12 @@ class WebViewerNode(Node):
                 'rx': ro.x, 'ry': ro.y, 'rz': ro.z, 'rw': ro.w,
             })
         if transforms:
+            with self._tf_cache_lock:
+                cache = self._tf_static_cache if static else self._tf_dynamic_cache
+                for tf in transforms:
+                    child = str(tf.get('child', '') or '').strip()
+                    if child:
+                        cache[child] = tf
             payload = {
                 'type': 'tf',
                 'static': static,
@@ -193,6 +203,31 @@ class WebViewerNode(Node):
                 'transforms': transforms,
             }
             self._server.broadcast_threadsafe(json.dumps(payload))
+
+    def _get_ws_init_messages(self) -> list[str]:
+        """Return cached state that new websocket clients need immediately."""
+        messages: list[str] = []
+        with self._tf_cache_lock:
+            static_transforms = list(self._tf_static_cache.values())
+            dynamic_transforms = list(self._tf_dynamic_cache.values())
+
+        if static_transforms:
+            messages.append(json.dumps({
+                'type': 'tf',
+                'static': True,
+                'fixed_frame': self._fixed_frame,
+                'transforms': static_transforms,
+            }))
+
+        if dynamic_transforms:
+            messages.append(json.dumps({
+                'type': 'tf',
+                'static': False,
+                'fixed_frame': self._fixed_frame,
+                'transforms': dynamic_transforms,
+            }))
+
+        return messages
 
     def _on_image(self, msg: Image, topic: str):
         try:

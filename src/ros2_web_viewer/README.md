@@ -80,7 +80,7 @@ Then open **http://localhost:8080** in a browser.
 | `html_panel_topic` | `/viewer_panel_html` | `std_msgs/String` source for right-side HTML panel |
 | `fixed_frame` | `base_link` | TF frame used as world/fixed frame (RViz-style) |
 
-`html_panel_topic` content is rendered in a dedicated panel on the page. Basic sanitization removes script-like elements and inline event handlers before insertion.
+`html_panel_topic` content is rendered in a dedicated panel on the page. It uses the browser Sanitizer API when available (with a safe plain-text fallback).
 
 ## Quick Test (without a real robot)
 

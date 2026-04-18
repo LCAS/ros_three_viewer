@@ -1039,63 +1039,45 @@ function isSafeUrl(url) {
   return true;
 }
 
-function buildSanitizedContent(html) {
-  const allowedTags = new Set([
-    'DIV', 'P', 'SPAN', 'STRONG', 'EM', 'B', 'I', 'U',
-    'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
-    'UL', 'OL', 'LI', 'BR', 'HR',
-    'CODE', 'PRE', 'BLOCKQUOTE',
-    'A',
-  ]);
-  const globalAttrs = new Set(['class', 'title', 'role']);
-  const tagAttrs = {
-    A: new Set(['href', 'target', 'rel']),
-  };
+const panelSanitizerConfig = {
+  allowElements: ['div', 'p', 'span', 'strong', 'em', 'b', 'i', 'u',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'ul', 'ol', 'li', 'br', 'hr', 'code', 'pre', 'blockquote', 'a'],
+  allowAttributes: {
+    class: ['*'],
+    title: ['*'],
+    role: ['*'],
+    href: ['a'],
+    target: ['a'],
+    rel: ['a'],
+  },
+};
 
-  const parsed = new DOMParser().parseFromString(html, 'text/html');
-
-  const sanitizeNode = (node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      return document.createTextNode(node.textContent || '');
+function normalizePanelLinks(root) {
+  for (const link of root.querySelectorAll('a')) {
+    const href = link.getAttribute('href');
+    if (!isSafeUrl(href)) {
+      link.removeAttribute('href');
+      link.removeAttribute('target');
+      link.removeAttribute('rel');
+      continue;
     }
-    if (node.nodeType !== Node.ELEMENT_NODE) return document.createDocumentFragment();
-
-    const tag = node.tagName.toUpperCase();
-    const childNodes = [...node.childNodes].map(sanitizeNode);
-
-    if (!allowedTags.has(tag)) {
-      const frag = document.createDocumentFragment();
-      childNodes.forEach(child => frag.appendChild(child));
-      return frag;
+    if (link.getAttribute('target') === '_blank') {
+      link.setAttribute('rel', 'noopener noreferrer');
     }
-
-    const safeEl = document.createElement(tag.toLowerCase());
-    for (const attr of [...node.attributes]) {
-      const name = attr.name.toLowerCase();
-      if (name.startsWith('on')) continue;
-
-      const isAllowed = globalAttrs.has(name) || tagAttrs[tag]?.has(name);
-      if (!isAllowed) continue;
-
-      if ((name === 'href' || name === 'src') && !isSafeUrl(attr.value)) continue;
-      safeEl.setAttribute(name, attr.value);
-    }
-
-    if (tag === 'A' && safeEl.getAttribute('target') === '_blank') {
-      safeEl.setAttribute('rel', 'noopener noreferrer');
-    }
-
-    childNodes.forEach(child => safeEl.appendChild(child));
-    return safeEl;
-  };
-
-  const fragment = document.createDocumentFragment();
-  [...parsed.body.childNodes].forEach(node => fragment.appendChild(sanitizeNode(node)));
-  return fragment;
+  }
 }
 
 function updateHtmlPanel(html, topic) {
-  htmlPanelContent.replaceChildren(buildSanitizedContent(html));
+  const rawHtml = String(html ?? '');
+  if (typeof window.Sanitizer === 'function' && typeof htmlPanelContent.setHTML === 'function') {
+    const sanitizer = new window.Sanitizer(panelSanitizerConfig);
+    htmlPanelContent.setHTML(rawHtml, { sanitizer });
+    normalizePanelLinks(htmlPanelContent);
+  } else {
+    // Safe fallback for browsers without Sanitizer API support.
+    htmlPanelContent.textContent = rawHtml;
+  }
   htmlTopicLabel.textContent = topic.split('/').pop();
   setStatus('html', topic, 'ok');
 }

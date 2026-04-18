@@ -316,8 +316,9 @@ function parseOriginEl(el) {
 
 function applyOrigin(obj, origin) {
   obj.position.set(origin.xyz[0], origin.xyz[1], origin.xyz[2]);
+  // URDF rpy is fixed-axis roll(X), pitch(Y), yaw(Z), equivalent to intrinsic ZYX.
   obj.quaternion.setFromEuler(
-    new THREE.Euler(origin.rpy[0], origin.rpy[1], origin.rpy[2], 'XYZ'));
+    new THREE.Euler(origin.rpy[0], origin.rpy[1], origin.rpy[2], 'ZYX'));
 }
 
 function parseMaterialColor(visualEl) {
@@ -398,6 +399,8 @@ function createLinkVisuals(linkEl, linkGroup) {
         const loader = new ColladaLoader();
         loader.load(url, (collada) => {
           const daeScene = collada.scene;
+          const daeRoot = new THREE.Group();
+
           if (scaleAttr) {
             const s = scaleAttr.trim().split(/\s+/).map(Number);
             daeScene.scale.set(s[0] ?? 1, s[1] ?? 1, s[2] ?? 1);
@@ -409,9 +412,10 @@ function createLinkVisuals(linkEl, linkGroup) {
               // Keep the DAE's own materials; they carry colour & texture info
             }
           });
-          applyOrigin(daeScene, origin);
+          applyOrigin(daeRoot, origin);
+          daeRoot.add(daeScene);
           linkGroup.remove(ph);
-          linkGroup.add(daeScene);
+          linkGroup.add(daeRoot);
         }, undefined, () => { /* silently keep placeholder */ });
         continue;  // handled async
       }

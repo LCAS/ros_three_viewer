@@ -195,11 +195,31 @@ html, body {
   color: var(--cream-dim);
 }
 
-#html-content-frame {
+#html-panel-content {
   width: 100%;
   flex: 1;
-  border: 0;
+  overflow: auto;
+  padding: 10px 12px;
   background: rgba(255, 255, 255, 0.96);
+  color: #1f2a18;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+#html-panel-content h1,
+#html-panel-content h2,
+#html-panel-content h3 {
+  margin: 0 0 8px;
+  color: #1f2a18;
+}
+
+#html-panel-content p {
+  margin: 0 0 8px;
+}
+
+#html-panel-content code {
+  font-family: var(--mono);
+  font-size: 0.8rem;
 }
 
 /* ── Status panel ────────────────────────────────────────── */

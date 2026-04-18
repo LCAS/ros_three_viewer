@@ -33,7 +33,7 @@ const WS_URL        = `ws://${location.host}/ws`;
 // ─────────────────────────────────────────────────────────────────────────────
 
 const canvas = document.getElementById('canvas');
-const htmlContentFrame = document.getElementById('html-content-frame');
+const htmlPanelContent = document.getElementById('html-panel-content');
 const htmlTopicLabel = document.getElementById('html-topic-label');
 
 const renderer = new THREE.WebGLRenderer({
@@ -1029,8 +1029,26 @@ function updateImage(dataUri, topic) {
   setStatus('image', topic, 'ok');
 }
 
+function sanitizeHtml(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  for (const el of doc.querySelectorAll('script, iframe, object, embed')) {
+    el.remove();
+  }
+  for (const el of doc.querySelectorAll('*')) {
+    for (const attr of [...el.attributes]) {
+      const name = attr.name.toLowerCase();
+      const value = String(attr.value || '').trim().toLowerCase();
+      if (name.startsWith('on')) el.removeAttribute(attr.name);
+      if ((name === 'href' || name === 'src') && value.startsWith('javascript:')) {
+        el.removeAttribute(attr.name);
+      }
+    }
+  }
+  return doc.body.innerHTML;
+}
+
 function updateHtmlPanel(html, topic) {
-  htmlContentFrame.srcdoc = html;
+  htmlPanelContent.innerHTML = sanitizeHtml(html);
   htmlTopicLabel.textContent = topic.split('/').pop();
   setStatus('html', topic, 'ok');
 }

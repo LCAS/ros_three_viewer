@@ -12,7 +12,7 @@ Designed for public exhibits (PhenAIx plant phenotyping platform) but fully gene
 | TF2 | `/tf` and `/tf_static` cached in a JS TF tree |
 | Point cloud | Decoded from `sensor_msgs/PointCloud2`; viridis or per-point RGB; GLSL glow shader |
 | Camera image | JPEG-compressed bridge from any `sensor_msgs/Image` topic |
-| Dynamic HTML panel | Right-side panel updated from a `std_msgs/String` topic (rendered in sandboxed iframe) |
+| Dynamic HTML panel | Right-side panel updated from a `std_msgs/String` topic (inserted into page panel) |
 | Post-processing | UnrealBloom pass for scanner glow effect |
 | Mesh serving | `package://` URIs resolved via `ament_index_python` → served at `/mesh/<pkg>/<path>` |
 | Auto-reconnect | WebSocket reconnects automatically if the backend restarts |
@@ -80,8 +80,7 @@ Then open **http://localhost:8080** in a browser.
 | `html_panel_topic` | `/viewer_panel_html` | `std_msgs/String` source for right-side HTML panel |
 | `fixed_frame` | `base_link` | TF frame used as world/fixed frame (RViz-style) |
 
-`html_panel_topic` content is rendered in an iframe with browser sandboxing enabled.
-Scripts are blocked; publish trusted static HTML snippets from ROS.
+`html_panel_topic` content is rendered in a dedicated panel on the page. Basic sanitization removes script-like elements and inline event handlers before insertion.
 
 ## Quick Test (without a real robot)
 

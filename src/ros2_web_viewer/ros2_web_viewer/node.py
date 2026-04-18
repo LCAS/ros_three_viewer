@@ -64,18 +64,33 @@ _LATCHING_QOS = QoSProfile(
 
 def _find_web_dir() -> str:
     """Locate the web/ directory whether running installed or from source."""
+    candidates = []
+
     try:
         from ament_index_python.packages import get_package_share_directory
         share = get_package_share_directory('ros2_web_viewer')
-        candidate = os.path.join(share, 'web')
-        if os.path.isdir(candidate):
-            log.info(f'Web assets found in package share directory: {candidate}')
-            return candidate
+        candidates.append(os.path.join(share, 'web'))
     except Exception:
-        log.warning('ros2_web_viewer package not found; attempting to locate web assets from source tree')
-        pass
-    # Running from source tree
-    log.warning('ros2_web_viewer running from source; web assets may not be found')
+        log.warning('ros2_web_viewer package not found via ament index; trying source tree fallback')
+
+    # Fallback: relative to this file (works from source and with symlink-install)
+    candidates.append(str(Path(__file__).parent.parent / 'web'))
+
+    for candidate in candidates:
+        if not os.path.isdir(candidate):
+            continue
+        # Resolve symlinks on a probe file so that Starlette's StaticFiles
+        # (which calls os.path.realpath on both directory and file paths when
+        # checking for path-traversal) receives the real directory path.
+        # This is required when built with `colcon --symlink-install`, where
+        # files in the share directory are symlinks that resolve outside it.
+        probe = os.path.join(candidate, 'index.html')
+        if os.path.isfile(probe):
+            real_dir = os.path.dirname(os.path.realpath(probe))
+            log.info(f'Web assets found at: {real_dir}')
+            return real_dir
+
+    log.warning('ros2_web_viewer: could not locate web assets directory; serving may fail')
     return str(Path(__file__).parent.parent / 'web')
 
 

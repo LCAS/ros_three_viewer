@@ -21,6 +21,8 @@ def generate_launch_description():
             launch_arguments={
                 'image_topics': "['/camera/color/image_raw']",
                 'pointcloud_topics': "['/integrated_cloud']",
+                'urdf_link_whitelist': '[]',
+                'urdf_link_blacklist': '[]',
             }.items(),
         ),
     ])

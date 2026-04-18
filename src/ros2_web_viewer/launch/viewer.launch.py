@@ -43,6 +43,16 @@ def generate_launch_description():
             'fixed_frame', default_value='base_link',
             description='Fixed TF frame used as world origin in the viewer'),
 
+        DeclareLaunchArgument(
+            'urdf_link_whitelist',
+            default_value='[]',
+            description='List of URDF link names to display; takes precedence over blacklist'),
+
+        DeclareLaunchArgument(
+            'urdf_link_blacklist',
+            default_value='[]',
+            description='List of URDF link names to hide when whitelist is empty'),
+
         Node(
             package='ros2_web_viewer',
             executable='ros2_web_viewer',
@@ -57,6 +67,8 @@ def generate_launch_description():
                 'image_jpeg_quality':     LaunchConfiguration('image_jpeg_quality'),
                 'html_panel_topic':       LaunchConfiguration('html_panel_topic'),
                 'fixed_frame':            LaunchConfiguration('fixed_frame'),
+                'urdf_link_whitelist':    LaunchConfiguration('urdf_link_whitelist'),
+                'urdf_link_blacklist':    LaunchConfiguration('urdf_link_blacklist'),
             }],
         ),
     ])

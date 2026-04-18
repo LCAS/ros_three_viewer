@@ -49,6 +49,7 @@ ros2 launch ros2_web_viewer viewer.launch.py \
     image_topics:="['/realsense/color/image_raw']" \
     pointcloud_topics:="['/realsense/depth/color/points']" \
     html_panel_topic:=/viewer_panel_html \
+  urdf_link_whitelist:="['base_link','shoulder_link','upper_arm_link']" \
     fixed_frame:=base_link \
     port:=8080
 ```
@@ -79,8 +80,12 @@ Then open **http://localhost:8080** in a browser.
 | `image_jpeg_quality` | `65` | JPEG quality (1–100) |
 | `html_panel_topic` | `/viewer_panel_html` | `std_msgs/String` source for right-side HTML panel |
 | `fixed_frame` | `base_link` | TF frame used as world/fixed frame (RViz-style) |
+| `urdf_link_whitelist` | `[]` | Links to render. If non-empty, only these links are displayed |
+| `urdf_link_blacklist` | `[]` | Links to hide when whitelist is empty |
 
 `html_panel_topic` content is rendered in a dedicated panel on the page. It uses the browser Sanitizer API when available (with a safe plain-text fallback).
+
+URDF filtering precedence: whitelist > blacklist > no filtering.
 
 ## Quick Test (without a real robot)
 

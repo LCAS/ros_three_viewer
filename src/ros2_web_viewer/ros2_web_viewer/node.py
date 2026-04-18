@@ -26,11 +26,13 @@ WebSocket message format  (all JSON):
 """
 
 import base64
+import ast
 import json
 import logging
 import math
 import os
 import threading
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import rclpy
@@ -118,7 +120,11 @@ class WebViewerNode(Node):
         self.declare_parameter('html_panel_topic', '/viewer_panel_html')
         self.declare_parameter('fixed_frame', 'base_link')
         self.declare_parameter('target_frame', 'base_link')
+        self.declare_parameter('urdf_link_whitelist', [])
+        self.declare_parameter('urdf_link_blacklist', [])
         self.declare_parameter('marker_array_topics', ['/markers'])
+        self._urdf_link_whitelist = self._resolve_string_list_parameter('urdf_link_whitelist')
+        self._urdf_link_blacklist = self._resolve_string_list_parameter('urdf_link_blacklist')
         self._fixed_frame = self._resolve_fixed_frame()
         self._server.set_client_init_messages_getter(self._get_ws_init_messages)
 
@@ -163,6 +169,100 @@ class WebViewerNode(Node):
 
         self.get_logger().info('ros2_web_viewer node initialised')
         self.get_logger().info(f'Using fixed frame: {self._fixed_frame}')
+        if self._urdf_link_whitelist:
+            if self._urdf_link_blacklist:
+                self.get_logger().info(
+                    'Both urdf_link_whitelist and urdf_link_blacklist were provided; '
+                    'using whitelist and ignoring blacklist')
+            self.get_logger().info(
+                f'Using URDF link whitelist ({len(self._urdf_link_whitelist)}): {self._urdf_link_whitelist}')
+        elif self._urdf_link_blacklist:
+            self.get_logger().info(
+                f'Using URDF link blacklist ({len(self._urdf_link_blacklist)}): {self._urdf_link_blacklist}')
+
+    def _resolve_string_list_parameter(self, name: str) -> list[str]:
+        """Return a normalised list[str] from a ROS parameter value."""
+        raw = self.get_parameter(name).value
+        items: list[str] = []
+        if isinstance(raw, (list, tuple, set)):
+            items = [str(v).strip() for v in raw]
+        elif isinstance(raw, str):
+            raw_str = raw.strip()
+            if raw_str.startswith('[') and raw_str.endswith(']'):
+                try:
+                    parsed = ast.literal_eval(raw_str)
+                    if isinstance(parsed, (list, tuple, set)):
+                        items = [str(v).strip() for v in parsed]
+                    else:
+                        items = [str(parsed).strip()]
+                except (ValueError, SyntaxError):
+                    # Fall back to comma-separated parsing.
+                    items = [part.strip() for part in raw_str.split(',')]
+            else:
+                # Support comma-separated strings for convenience.
+                items = [part.strip() for part in raw_str.split(',')]
+        else:
+            items = [str(raw).strip()] if raw is not None else []
+
+        # Preserve order while removing blanks and duplicates.
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for item in items:
+            if not item or item in seen:
+                continue
+            seen.add(item)
+            deduped.append(item)
+        return deduped
+
+    def _filter_urdf_links(self, urdf_xml: str) -> tuple[str, int, int, int]:
+        """Filter URDF links using whitelist/blacklist semantics.
+
+        Precedence: whitelist > blacklist > no filtering.
+        Returns (filtered_xml, original_link_count, kept_link_count, removed_joint_count).
+        """
+        whitelist = set(self._urdf_link_whitelist)
+        blacklist = set(self._urdf_link_blacklist)
+
+        if not whitelist and not blacklist:
+            return urdf_xml, 0, 0, 0
+
+        try:
+            root = ET.fromstring(urdf_xml)
+        except ET.ParseError as exc:
+            self.get_logger().warning(
+                f'Failed to parse URDF for link filtering; serving unfiltered URDF: {exc}')
+            return urdf_xml, 0, 0, 0
+
+        link_elements = [el for el in root.findall('link') if el.get('name')]
+        if not link_elements:
+            return urdf_xml, 0, 0, 0
+
+        link_names = [str(el.get('name')) for el in link_elements]
+        link_name_set = set(link_names)
+
+        if whitelist:
+            selected_links = link_name_set.intersection(whitelist)
+        else:
+            selected_links = link_name_set.difference(blacklist)
+
+        for link_el in list(root.findall('link')):
+            name = str(link_el.get('name') or '')
+            if name and name not in selected_links:
+                root.remove(link_el)
+
+        removed_joints = 0
+        for joint_el in list(root.findall('joint')):
+            parent_el = joint_el.find('parent')
+            child_el = joint_el.find('child')
+            parent_link = str(parent_el.get('link') if parent_el is not None else '')
+            child_link = str(child_el.get('link') if child_el is not None else '')
+
+            if parent_link not in selected_links or child_link not in selected_links:
+                root.remove(joint_el)
+                removed_joints += 1
+
+        filtered_xml = ET.tostring(root, encoding='unicode')
+        return filtered_xml, len(link_names), len(selected_links), removed_joints
 
     def _resolve_fixed_frame(self) -> str:
         """Pick fixed frame with precedence fixed_frame > target_frame > base_link.
@@ -183,8 +283,16 @@ class WebViewerNode(Node):
     # ── Callbacks ────────────────────────────────────────────────────────
 
     def _on_urdf(self, msg: String):
-        self._urdf = msg.data
-        self.get_logger().info(f'robot_description received ({len(msg.data)} bytes)')
+        filtered_urdf, total_links, kept_links, removed_joints = self._filter_urdf_links(msg.data)
+        self._urdf = filtered_urdf
+
+        if total_links > 0:
+            self.get_logger().info(
+                'robot_description received '
+                f'({len(msg.data)} bytes), URDF link filter kept {kept_links}/{total_links} links '
+                f'and removed {removed_joints} joints')
+        else:
+            self.get_logger().info(f'robot_description received ({len(msg.data)} bytes)')
 
     def _on_joint_states(self, msg: JointState):
         payload = {

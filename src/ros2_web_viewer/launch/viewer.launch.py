@@ -36,6 +36,10 @@ def generate_launch_description():
             description='JPEG quality for compressed image bridge (1-100)'),
 
         DeclareLaunchArgument(
+            'html_panel_topic', default_value='/viewer_panel_html',
+            description='std_msgs/String topic used to populate the right-side HTML panel'),
+
+        DeclareLaunchArgument(
             'fixed_frame', default_value='base_link',
             description='Fixed TF frame used as world origin in the viewer'),
 
@@ -51,6 +55,7 @@ def generate_launch_description():
                 'pointcloud_topics':      LaunchConfiguration('pointcloud_topics'),
                 'pointcloud_max_points':  LaunchConfiguration('pointcloud_max_points'),
                 'image_jpeg_quality':     LaunchConfiguration('image_jpeg_quality'),
+                'html_panel_topic':       LaunchConfiguration('html_panel_topic'),
                 'fixed_frame':            LaunchConfiguration('fixed_frame'),
             }],
         ),

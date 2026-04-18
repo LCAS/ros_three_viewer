@@ -33,6 +33,8 @@ const WS_URL        = `ws://${location.host}/ws`;
 // ─────────────────────────────────────────────────────────────────────────────
 
 const canvas = document.getElementById('canvas');
+const htmlContentFrame = document.getElementById('html-content-frame');
+const htmlTopicLabel = document.getElementById('html-topic-label');
 
 const renderer = new THREE.WebGLRenderer({
   canvas,
@@ -40,12 +42,18 @@ const renderer = new THREE.WebGLRenderer({
   powerPreference: 'high-performance',
 });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+function getCanvasSize() {
+  return {
+    width: Math.max(canvas.clientWidth, 1),
+    height: Math.max(canvas.clientHeight, 1),
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Scene
@@ -67,8 +75,7 @@ scene.add(rosSceneRoot);
 // Camera & controls
 // ─────────────────────────────────────────────────────────────────────────────
 
-const camera = new THREE.PerspectiveCamera(
-  55, window.innerWidth / window.innerHeight, 0.001, 60);
+const camera = new THREE.PerspectiveCamera(55, 1.0, 0.001, 60);
 camera.position.set(2.0, 1.6, 2.0);
 camera.lookAt(0, 0.5, 0);
 
@@ -89,8 +96,9 @@ controls.update();
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 
+const initialCanvasSize = getCanvasSize();
 const bloomPass = new UnrealBloomPass(
-  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  new THREE.Vector2(initialCanvasSize.width, initialCanvasSize.height),
   /*strength*/ 0.25, /*radius*/ 0.5, /*threshold*/ 0.88);
 composer.addPass(bloomPass);
 
@@ -995,6 +1003,10 @@ function connectWS() {
       case 'marker_array':
         updateMarkerArray(msg);
         break;
+
+      case 'html_panel':
+        updateHtmlPanel(msg.data, msg.topic);
+        break;
     }
   };
 }
@@ -1015,6 +1027,12 @@ function updateImage(dataUri, topic) {
   imgTopicLabel.textContent = topic.split('/').pop();
   imagePanel.classList.remove('hidden');
   setStatus('image', topic, 'ok');
+}
+
+function updateHtmlPanel(html, topic) {
+  htmlContentFrame.srcdoc = html;
+  htmlTopicLabel.textContent = topic.split('/').pop();
+  setStatus('html', topic, 'ok');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1059,10 +1077,11 @@ function setWsStatus(connected) {
 }
 
 function setStatus(key, text, state) {
-  // key: 'robot' | 'joints' | 'cloud' | 'image' | 'markers'
+  // key: 'robot' | 'joints' | 'cloud' | 'image' | 'markers' | 'html'
   const map = {
     robot: 'st-robot', joints: 'st-joints',
     cloud: 'st-cloud', image: 'st-image', markers: 'st-markers',
+    html: 'st-html',
   };
   const el = document.getElementById(map[key]);
   if (!el) return;
@@ -1105,11 +1124,12 @@ function animate() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  const { width, height } = getCanvasSize();
+  camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
-  bloomPass.resolution.set(window.innerWidth, window.innerHeight);
+  renderer.setSize(width, height, false);
+  composer.setSize(width, height);
+  bloomPass.resolution.set(width, height);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1128,4 +1148,5 @@ setTimeout(() => {
 
 connectWS();
 fetchURDF();
+window.dispatchEvent(new Event('resize'));
 animate();

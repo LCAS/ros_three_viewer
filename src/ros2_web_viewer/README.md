@@ -12,6 +12,7 @@ Designed for public exhibits (PhenAIx plant phenotyping platform) but fully gene
 | TF2 | `/tf` and `/tf_static` cached in a JS TF tree |
 | Point cloud | Decoded from `sensor_msgs/PointCloud2`; viridis or per-point RGB; GLSL glow shader |
 | Camera image | JPEG-compressed bridge from any `sensor_msgs/Image` topic |
+| Dynamic HTML panel | Right-side panel updated from a `std_msgs/String` topic |
 | Post-processing | UnrealBloom pass for scanner glow effect |
 | Mesh serving | `package://` URIs resolved via `ament_index_python` → served at `/mesh/<pkg>/<path>` |
 | Auto-reconnect | WebSocket reconnects automatically if the backend restarts |
@@ -47,6 +48,7 @@ ros2 launch ros2_web_viewer viewer.launch.py
 ros2 launch ros2_web_viewer viewer.launch.py \
     image_topics:="['/realsense/color/image_raw']" \
     pointcloud_topics:="['/realsense/depth/color/points']" \
+    html_panel_topic:=/viewer_panel_html \
     fixed_frame:=base_link \
     port:=8080
 ```
@@ -61,6 +63,7 @@ Then open **http://localhost:8080** in a browser.
 | `/joint_states` | `sensor_msgs/JointState` | |
 | `/tf` | `tf2_msgs/TFMessage` | |
 | `/tf_static` | `tf2_msgs/TFMessage` | latching QoS |
+| `<html_panel_topic>` | `std_msgs/String` | right-side panel HTML |
 | `<image_topics>` | `sensor_msgs/Image` | configurable list |
 | `<pointcloud_topics>` | `sensor_msgs/PointCloud2` | configurable list |
 
@@ -74,6 +77,7 @@ Then open **http://localhost:8080** in a browser.
 | `pointcloud_topics` | `['/points']` | Point cloud topics |
 | `pointcloud_max_points` | `8000` | Cloud downsampling limit |
 | `image_jpeg_quality` | `65` | JPEG quality (1–100) |
+| `html_panel_topic` | `/viewer_panel_html` | `std_msgs/String` source for right-side HTML panel |
 | `fixed_frame` | `base_link` | TF frame used as world/fixed frame (RViz-style) |
 
 ## Quick Test (without a real robot)
@@ -86,6 +90,10 @@ ros2 topic pub /robot_description std_msgs/String \
 # Publish fake joint states
 ros2 topic pub /joint_states sensor_msgs/JointState \
   "{name: ['joint1'], position: [0.5]}"
+
+# Update right-side HTML panel
+ros2 topic pub /viewer_panel_html std_msgs/String \
+  "data: '<div style=\"padding:12px\"><h3>Hello from ROS</h3><p>Panel update works.</p></div>'"
 ```
 
 ## Customisation

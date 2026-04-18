@@ -19,6 +19,7 @@ WebSocket message format  (all JSON):
   { type: 'image',      topic, data: 'data:image/jpeg;base64,...' }
   { type: 'pointcloud', topic, frame_id, count, data: '<base64 packed float32>' }
      data layout: N × [x y z r g b] each a float32 (24 bytes/point)
+  { type: 'html_panel', topic, data: '<html string>' }
   { type: 'marker_array', topic, markers: [{ns, id, type, action, frame_id,
      px, py, pz, rx, ry, rz, rw, sx, sy, sz, r, g, b, a,
      text, mesh_resource, points: [[x,y,z],...], colors: [[r,g,b,a],...]},...] }
@@ -94,6 +95,7 @@ class WebViewerNode(Node):
         self.declare_parameter('pointcloud_topics', ['/points'])
         self.declare_parameter('pointcloud_max_points', 8000)
         self.declare_parameter('image_jpeg_quality', 65)
+        self.declare_parameter('html_panel_topic', '/viewer_panel_html')
         self.declare_parameter('fixed_frame', 'base_link')
         self.declare_parameter('target_frame', 'base_link')
         self.declare_parameter('marker_array_topics', ['/markers'])
@@ -130,6 +132,13 @@ class WebViewerNode(Node):
                 MarkerArray, topic,
                 lambda msg, t=topic: self._on_marker_array(msg, t), 5)
             self.get_logger().info(f'Subscribed to marker_array topic: {topic}')
+
+        html_panel_topic = str(self.get_parameter('html_panel_topic').value or '').strip()
+        if html_panel_topic:
+            self.create_subscription(
+                String, html_panel_topic,
+                lambda msg, t=html_panel_topic: self._on_html_panel(msg, t), 5)
+            self.get_logger().info(f'Subscribed to html panel topic: {html_panel_topic}')
 
         self.get_logger().info('ros2_web_viewer node initialised')
         self.get_logger().info(f'Using fixed frame: {self._fixed_frame}')
@@ -261,6 +270,14 @@ class WebViewerNode(Node):
             'type': 'marker_array',
             'topic': topic,
             'markers': markers,
+        }
+        self._server.broadcast_threadsafe(json.dumps(payload))
+
+    def _on_html_panel(self, msg: String, topic: str):
+        payload = {
+            'type': 'html_panel',
+            'topic': topic,
+            'data': msg.data,
         }
         self._server.broadcast_threadsafe(json.dumps(payload))
 

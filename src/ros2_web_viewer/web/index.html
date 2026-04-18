@@ -18,8 +18,67 @@
 </head>
 <body>
 
-  <!-- ── Three.js canvas ─────────────────────────────── -->
-  <canvas id="canvas"></canvas>
+  <div id="app-layout">
+    <div id="left-pane">
+      <div id="viewer-square">
+        <!-- ── Three.js canvas ─────────────────────────────── -->
+        <canvas id="canvas"></canvas>
+      </div>
+    </div>
+
+    <div id="right-pane">
+      <div id="html-panel">
+        <div id="html-panel-header">
+          <span>&#x25CF;&nbsp;DYNAMIC PANEL</span>
+          <span id="html-topic-label">—</span>
+        </div>
+        <iframe id="html-content-frame" title="Dynamic panel content" sandbox></iframe>
+      </div>
+
+      <!-- ── Status panel ───────────────────────────────────── -->
+      <div id="status-panel">
+        <div id="status-header">System Status</div>
+        <div class="status-row">
+          <span class="status-label">ROBOT</span>
+          <span class="status-value warn" id="st-robot">waiting…</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">JOINTS</span>
+          <span class="status-value" id="st-joints">—</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">CLOUD</span>
+          <span class="status-value" id="st-cloud">—</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">MARKERS</span>
+          <span class="status-value" id="st-markers">—</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">IMAGE</span>
+          <span class="status-value" id="st-image">—</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">HTML</span>
+          <span class="status-value" id="st-html">—</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">FPS</span>
+          <span class="status-value" id="st-fps">—</span>
+        </div>
+      </div>
+
+      <!-- ── Camera image panel ───────────────────────────── -->
+      <div id="image-panel" class="hidden">
+        <div id="image-header">
+          <span>&#x25CF;&nbsp;SENSOR FEED</span>
+          <span id="image-topic-label">—</span>
+        </div>
+        <img id="camera-image" alt="camera feed" style="display:none" />
+        <div id="image-placeholder">NO SIGNAL</div>
+      </div>
+    </div>
+  </div>
 
   <!-- ── Aesthetic overlays ──────────────────────────── -->
   <div id="bg-wallpaper"></div>
@@ -40,45 +99,6 @@
       <div id="ws-dot"></div>
       <span id="ws-label">OFFLINE</span>
     </div>
-  </div>
-
-  <!-- ── Status panel (bottom-left) ──────────────────── -->
-  <div id="status-panel">
-    <div id="status-header">System Status</div>
-    <div class="status-row">
-      <span class="status-label">ROBOT</span>
-      <span class="status-value warn" id="st-robot">waiting…</span>
-    </div>
-    <div class="status-row">
-      <span class="status-label">JOINTS</span>
-      <span class="status-value" id="st-joints">—</span>
-    </div>
-    <div class="status-row">
-      <span class="status-label">CLOUD</span>
-      <span class="status-value" id="st-cloud">—</span>
-    </div>
-    <div class="status-row">
-      <span class="status-label">MARKERS</span>
-      <span class="status-value" id="st-markers">—</span>
-    </div>
-    <div class="status-row">
-      <span class="status-label">IMAGE</span>
-      <span class="status-value" id="st-image">—</span>
-    </div>
-    <div class="status-row">
-      <span class="status-label">FPS</span>
-      <span class="status-value" id="st-fps">—</span>
-    </div>
-  </div>
-
-  <!-- ── Camera image panel (bottom-right) ───────────── -->
-  <div id="image-panel" class="hidden">
-    <div id="image-header">
-      <span>&#x25CF;&nbsp;SENSOR FEED</span>
-      <span id="image-topic-label">—</span>
-    </div>
-    <img id="camera-image" alt="camera feed" style="display:none" />
-    <div id="image-placeholder">NO SIGNAL</div>
   </div>
 
   <!-- ── Loading screen ──────────────────────────────── -->

@@ -34,11 +34,43 @@ html, body {
   font-family: var(--sans);
 }
 
+/* ── Main two-pane layout ─────────────────────────────────── */
+#app-layout {
+  position: fixed;
+  top: 52px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  gap: 20px;
+  padding: 12px 20px 20px;
+  z-index: 12;
+}
+
+#left-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+#viewer-square {
+  position: relative;
+  width: min(max(300px, calc(100vw - 460px)), calc(100vh - 84px));
+  height: min(max(300px, calc(100vw - 460px)), calc(100vh - 84px));
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.15);
+}
+
 /* ── Canvas ───────────────────────────────────────────────── */
 #canvas {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   display: block;
 }
 
@@ -128,16 +160,55 @@ html, body {
 }
 #ws-dot.connected { background: var(--good); }
 
-/* ── Bottom-left status panel ────────────────────────────── */
-#status-panel {
-  position: fixed;
-  bottom: 20px; left: 20px;
-  width: 240px;
+/* ── Right pane ──────────────────────────────────────────── */
+#right-pane {
+  width: 420px;
+  max-width: 36vw;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#html-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 240px;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 4px;
   backdrop-filter: var(--panel-blur);
-  z-index: 20;
+  overflow: hidden;
+}
+
+#html-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--panel-border);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cream-dim);
+}
+
+#html-content-frame {
+  width: 100%;
+  flex: 1;
+  border: 0;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+/* ── Status panel ────────────────────────────────────────── */
+#status-panel {
+  width: 100%;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  backdrop-filter: var(--panel-blur);
   overflow: hidden;
 }
 
@@ -189,22 +260,19 @@ html, body {
 .status-value.warn { color: var(--warn); }
 .status-value.bad  { color: var(--danger); }
 
-/* ── Right-side image panel ──────────────────────────────── */
+/* ── Image panel ─────────────────────────────────────────── */
 #image-panel {
-  position: fixed;
-  bottom: 20px; right: 20px;
-  width: 320px;
+  width: 100%;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 4px;
   backdrop-filter: var(--panel-blur);
-  z-index: 20;
   overflow: hidden;
-  transition: opacity 0.4s, transform 0.4s;
+  transition: opacity 0.3s ease;
 }
 #image-panel.hidden {
   opacity: 0;
-  transform: translateX(20px);
+  height: 0;
   pointer-events: none;
 }
 
@@ -272,6 +340,21 @@ html, body {
 #corner-br { bottom: 12px; right: 12px; }
 #corner-br::before { bottom: 0; right: 0; }
 #corner-br::after  { bottom: 0; right: 0; }
+
+@media (max-width: 1200px) {
+  #app-layout {
+    gap: 12px;
+    padding: 10px 12px 12px;
+  }
+  #right-pane {
+    min-width: 280px;
+    width: 360px;
+  }
+  #viewer-square {
+    width: min(max(240px, calc(100vw - 400px)), calc(100vh - 74px));
+    height: min(max(240px, calc(100vw - 400px)), calc(100vh - 74px));
+  }
+}
 
 /* ── Loading overlay ─────────────────────────────────────── */
 #loading {

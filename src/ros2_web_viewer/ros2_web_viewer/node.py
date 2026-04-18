@@ -92,6 +92,8 @@ class WebViewerNode(Node):
         self._tf_cache_lock = threading.Lock()
         self._tf_static_cache: dict[str, dict] = {}
         self._tf_dynamic_cache: dict[str, dict] = {}
+        self._marker_cache_lock = threading.Lock()
+        self._marker_cache_by_topic: dict[str, dict[str, dict]] = {}
 
         # ── Parameters ──────────────────────────────────────────────────
         self.declare_parameter('image_topics', ['/camera/image_raw'])
@@ -210,6 +212,12 @@ class WebViewerNode(Node):
         with self._tf_cache_lock:
             static_transforms = list(self._tf_static_cache.values())
             dynamic_transforms = list(self._tf_dynamic_cache.values())
+        with self._marker_cache_lock:
+            marker_snapshots = {
+                topic: list(marker_map.values())
+                for topic, marker_map in self._marker_cache_by_topic.items()
+                if marker_map
+            }
 
         if static_transforms:
             messages.append(json.dumps({
@@ -225,6 +233,13 @@ class WebViewerNode(Node):
                 'static': False,
                 'fixed_frame': self._fixed_frame,
                 'transforms': dynamic_transforms,
+            }))
+
+        for topic, markers in marker_snapshots.items():
+            messages.append(json.dumps({
+                'type': 'marker_array',
+                'topic': topic,
+                'markers': markers,
             }))
 
         return messages
@@ -275,32 +290,54 @@ class WebViewerNode(Node):
 
     def _on_marker_array(self, msg: MarkerArray, topic: str):
         markers = []
-        for m in msg.markers:
-            markers.append({
-                'ns': m.ns,
-                'id': m.id,
-                'type': m.type,
-                'action': m.action,
-                'frame_id': m.header.frame_id,
-                'px': float(m.pose.position.x),
-                'py': float(m.pose.position.y),
-                'pz': float(m.pose.position.z),
-                'rx': float(m.pose.orientation.x),
-                'ry': float(m.pose.orientation.y),
-                'rz': float(m.pose.orientation.z),
-                'rw': float(m.pose.orientation.w),
-                'sx': float(m.scale.x),
-                'sy': float(m.scale.y),
-                'sz': float(m.scale.z),
-                'r': float(m.color.r),
-                'g': float(m.color.g),
-                'b': float(m.color.b),
-                'a': float(m.color.a),
-                'text': m.text,
-                'mesh_resource': m.mesh_resource,
-                'points': [[float(p.x), float(p.y), float(p.z)] for p in m.points],
-                'colors': [[float(c.r), float(c.g), float(c.b), float(c.a)] for c in m.colors],
-            })
+        with self._marker_cache_lock:
+            marker_cache = self._marker_cache_by_topic.setdefault(topic, {})
+
+            for m in msg.markers:
+                marker = {
+                    'ns': m.ns,
+                    'id': m.id,
+                    'type': m.type,
+                    'action': m.action,
+                    'frame_id': m.header.frame_id,
+                    'px': float(m.pose.position.x),
+                    'py': float(m.pose.position.y),
+                    'pz': float(m.pose.position.z),
+                    'rx': float(m.pose.orientation.x),
+                    'ry': float(m.pose.orientation.y),
+                    'rz': float(m.pose.orientation.z),
+                    'rw': float(m.pose.orientation.w),
+                    'sx': float(m.scale.x),
+                    'sy': float(m.scale.y),
+                    'sz': float(m.scale.z),
+                    'r': float(m.color.r),
+                    'g': float(m.color.g),
+                    'b': float(m.color.b),
+                    'a': float(m.color.a),
+                    'text': m.text,
+                    'mesh_resource': m.mesh_resource,
+                    'points': [[float(p.x), float(p.y), float(p.z)] for p in m.points],
+                    'colors': [[float(c.r), float(c.g), float(c.b), float(c.a)] for c in m.colors],
+                }
+                markers.append(marker)
+
+                key = f"{marker['ns']}:{marker['id']}"
+                action = int(marker['action'])
+                if action == 2:  # DELETE
+                    marker_cache.pop(key, None)
+                elif action == 3:  # DELETEALL
+                    ns = str(marker['ns'] or '').strip()
+                    if ns:
+                        for cache_key in [k for k in marker_cache.keys() if k.startswith(f'{ns}:')]:
+                            marker_cache.pop(cache_key, None)
+                    else:
+                        marker_cache.clear()
+                else:  # ADD / MODIFY
+                    marker_cache[key] = marker
+
+            if not marker_cache:
+                self._marker_cache_by_topic.pop(topic, None)
+
         payload = {
             'type': 'marker_array',
             'topic': topic,

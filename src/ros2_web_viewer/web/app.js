@@ -614,6 +614,7 @@ function applyTF(transforms, _static, fixedFrameFromMsg) {
   }
   updateRobotPoseFromTF();
   updatePointCloudPoseFromTF();
+  updateMarkerPosesFromTF();
 }
 
 function getFrameToRootMatrix(frameId) {
@@ -705,6 +706,8 @@ rosSceneRoot.add(markerRoot);
 
 // "ns:id" → Object3D
 const markerObjects = new Map();
+// "ns:id" → latest marker payload (for TF-driven pose refresh)
+const markerMessages = new Map();
 
 // Walk TF chain to compute world-space matrix of a named frame
 function getFrameWorldMatrix(frameId) {
@@ -771,14 +774,9 @@ function createMarkerObject(m) {
       const headR  = m.sz > 0 ? m.sz / 2 : shaftR * 2.5;
 
       if (m.points && m.points.length >= 2) {
-        // points[0] → points[1] in the reference frame (override pose)
-        const frameMat = getFrameWorldMatrix(m.frame_id);
-        const fPos = new THREE.Vector3();
-        const fQuat = new THREE.Quaternion();
-        frameMat.decompose(fPos, fQuat, new THREE.Vector3());
-
-        const pStart = new THREE.Vector3(...m.points[0]).applyQuaternion(fQuat).add(fPos);
-        const pEnd   = new THREE.Vector3(...m.points[1]).applyQuaternion(fQuat).add(fPos);
+        // points[0] → points[1] in marker reference frame (override pose)
+        const pStart = new THREE.Vector3(...m.points[0]);
+        const pEnd   = new THREE.Vector3(...m.points[1]);
         const dir    = pEnd.clone().sub(pStart);
         const len2   = dir.length();
         if (len2 < 1e-6) return null;
@@ -789,7 +787,6 @@ function createMarkerObject(m) {
         const grp  = makeArrowGeom(len2, sh2R, he2R, r, g, b, a);
         grp.position.copy(pStart);
         grp.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir);
-        grp.userData.skipPose = true;
         return grp;
       }
       return makeArrowGeom(length, shaftR, headR, r, g, b, a);
@@ -979,6 +976,7 @@ function _removeMarker(key) {
   markerRoot.remove(obj);
   disposeMarker(obj);
   markerObjects.delete(key);
+  markerMessages.delete(key);
 }
 
 function _removeAllMarkers(ns) {
@@ -1002,9 +1000,18 @@ function updateMarkerArray(msg) {
     applyMarkerPose(obj, m);
     markerRoot.add(obj);
     markerObjects.set(key, obj);
+    markerMessages.set(key, m);
   }
   const n = markerObjects.size;
   setStatus('markers', `${n} marker${n !== 1 ? 's' : ''}`, 'ok');
+}
+
+function updateMarkerPosesFromTF() {
+  for (const [key, obj] of markerObjects.entries()) {
+    const msg = markerMessages.get(key);
+    if (!msg) continue;
+    applyMarkerPose(obj, msg);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

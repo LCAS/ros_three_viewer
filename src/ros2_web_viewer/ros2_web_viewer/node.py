@@ -135,6 +135,10 @@ class WebViewerNode(Node):
         self.get_logger().info(f'Using fixed frame: {self._fixed_frame}')
 
     def _resolve_fixed_frame(self) -> str:
+        """Pick fixed frame with precedence fixed_frame > target_frame > base_link.
+
+        Leading slashes are stripped to normalise TF frame IDs.
+        """
         fixed_frame = str(self.get_parameter('fixed_frame').value or '').strip()
         target_frame = str(self.get_parameter('target_frame').value or '').strip()
         selected = fixed_frame or target_frame or 'base_link'

@@ -549,6 +549,7 @@ function applyJointStates(names, positions) {
 
 const tfTree = {};  // frame_id → { parent, tx, ty, tz, rx, ry, rz, rw }
 let fixedFrame = 'base_link';
+let fixedFrameLocked = false;
 
 function normalizeFrameId(frameId) {
   return (frameId || '').trim().replace(/^\/+/, '');
@@ -556,7 +557,15 @@ function normalizeFrameId(frameId) {
 
 function applyTF(transforms, _static, fixedFrameFromMsg) {
   if (fixedFrameFromMsg) {
-    fixedFrame = normalizeFrameId(fixedFrameFromMsg) || 'base_link';
+    const requestedFixedFrame = normalizeFrameId(fixedFrameFromMsg) || 'base_link';
+    if (!fixedFrameLocked) {
+      fixedFrame = requestedFixedFrame;
+      fixedFrameLocked = true;
+    } else if (requestedFixedFrame !== fixedFrame) {
+      console.warn(
+        `[TF] Ignoring fixed frame change from "${fixedFrame}" to "${requestedFixedFrame}"`,
+      );
+    }
   }
   for (const t of transforms) {
     const child = normalizeFrameId(t.child);
@@ -603,7 +612,12 @@ function getFrameMatrixInFixedFrame(frameId) {
 function updateRobotPoseFromTF() {
   if (!robotLoaded) return;
   const frameMat = getFrameMatrixInFixedFrame(robotBaseFrame);
-  if (!frameMat) return;
+  if (!frameMat) {
+    robotRoot.position.set(0, 0, 0);
+    robotRoot.quaternion.identity();
+    robotRoot.scale.set(1, 1, 1);
+    return;
+  }
   frameMat.decompose(robotRoot.position, robotRoot.quaternion, robotRoot.scale);
 }
 

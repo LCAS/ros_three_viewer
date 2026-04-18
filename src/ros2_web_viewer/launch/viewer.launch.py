@@ -35,6 +35,10 @@ def generate_launch_description():
             'image_jpeg_quality', default_value='65',
             description='JPEG quality for compressed image bridge (1-100)'),
 
+        DeclareLaunchArgument(
+            'fixed_frame', default_value='base_link',
+            description='Fixed TF frame used as world origin in the viewer'),
+
         Node(
             package='ros2_web_viewer',
             executable='ros2_web_viewer',
@@ -47,6 +51,7 @@ def generate_launch_description():
                 'pointcloud_topics':      LaunchConfiguration('pointcloud_topics'),
                 'pointcloud_max_points':  LaunchConfiguration('pointcloud_max_points'),
                 'image_jpeg_quality':     LaunchConfiguration('image_jpeg_quality'),
+                'fixed_frame':            LaunchConfiguration('fixed_frame'),
             }],
         ),
     ])

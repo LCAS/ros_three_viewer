@@ -18,3 +18,4 @@
     # Performance
     pointcloud_max_points: 8000   # downsamples heavier clouds
     image_jpeg_quality:    65     # 1-100; lower = faster but blurrier
+    fixed_frame: "base_link"      # TF frame used as world origin (RViz-style)

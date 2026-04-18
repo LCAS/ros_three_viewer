@@ -47,6 +47,7 @@ ros2 launch ros2_web_viewer viewer.launch.py
 ros2 launch ros2_web_viewer viewer.launch.py \
     image_topics:="['/realsense/color/image_raw']" \
     pointcloud_topics:="['/realsense/depth/color/points']" \
+    fixed_frame:=base_link \
     port:=8080
 ```
 
@@ -73,6 +74,7 @@ Then open **http://localhost:8080** in a browser.
 | `pointcloud_topics` | `['/points']` | Point cloud topics |
 | `pointcloud_max_points` | `8000` | Cloud downsampling limit |
 | `image_jpeg_quality` | `65` | JPEG quality (1–100) |
+| `fixed_frame` | `base_link` | TF frame used as world/fixed frame (RViz-style) |
 
 ## Quick Test (without a real robot)
 

@@ -55,6 +55,14 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1e1408);
 scene.fog = new THREE.FogExp2(0x1e1408, 0.05);
 
+// ROS (X forward, Y left, Z up) → Three (X right, Y up, Z out) basis change
+const ROS_TO_THREE_QUAT = new THREE.Quaternion()
+  .setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0, 'XYZ'));
+const rosSceneRoot = new THREE.Group();
+rosSceneRoot.name = 'ros_scene_root';
+rosSceneRoot.quaternion.copy(ROS_TO_THREE_QUAT);
+scene.add(rosSceneRoot);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Camera & controls
 // ─────────────────────────────────────────────────────────────────────────────
@@ -146,7 +154,7 @@ scene.add(groundMesh);
   axGroup.add(mkAxis(0xff2244, new THREE.Euler(0, 0, -Math.PI / 2)));  // X red
   axGroup.add(mkAxis(0x22ff44, new THREE.Euler(0, 0, 0)));              // Y green
   axGroup.add(mkAxis(0x2244ff, new THREE.Euler(Math.PI / 2, 0, 0)));   // Z blue
-  scene.add(axGroup);
+  rosSceneRoot.add(axGroup);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -199,7 +207,7 @@ const cloudMat = new THREE.ShaderMaterial({
 
 const pointCloud = new THREE.Points(cloudGeo, cloudMat);
 pointCloud.frustumCulled = false;
-scene.add(pointCloud);
+rosSceneRoot.add(pointCloud);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Viridis colourmap (JS-side, for any unmapped points)
@@ -250,6 +258,15 @@ function updatePointCloud(b64, count, frameId) {
   cloudGeo.setDrawRange(0, n);
   cloudGeo.attributes.position.needsUpdate = true;
   cloudGeo.attributes.aColor.needsUpdate   = true;
+
+  const frameMat = getFrameMatrixInFixedFrame(frameId);
+  if (frameMat) {
+    frameMat.decompose(pointCloud.position, pointCloud.quaternion, pointCloud.scale);
+  } else {
+    pointCloud.position.set(0, 0, 0);
+    pointCloud.quaternion.identity();
+    pointCloud.scale.set(1, 1, 1);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -258,7 +275,7 @@ function updatePointCloud(b64, count, frameId) {
 
 const robotRoot = new THREE.Group();
 robotRoot.name = 'robot_root';
-scene.add(robotRoot);
+rosSceneRoot.add(robotRoot);
 
 // Maps populated when URDF is parsed
 const jointPivots       = {};   // joint name → Group (the pivot at joint origin)
@@ -269,6 +286,7 @@ const jointOriginPos    = {};   // joint name → Vector3   (initial, from origi
 
 let   robotLoaded       = false;
 let   pendingJointState = null;
+let   robotBaseFrame    = 'base_link';
 
 // ── Material factory ──────────────────────────────────────────────────────
 
@@ -486,6 +504,8 @@ async function loadURDF(xmlString) {
                    ?? Object.keys(linkGroups)[0];
   if (rootName && linkGroups[rootName]) {
     robotRoot.add(linkGroups[rootName]);
+    robotBaseFrame = normalizeFrameId(rootName) || 'base_link';
+    updateRobotPoseFromTF();
   }
 
   robotLoaded = true;
@@ -528,15 +548,63 @@ function applyJointStates(names, positions) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const tfTree = {};  // frame_id → { parent, tx, ty, tz, rx, ry, rz, rw }
+let fixedFrame = 'base_link';
 
-function applyTF(transforms, _static) {
+function normalizeFrameId(frameId) {
+  return (frameId || '').trim().replace(/^\/+/, '');
+}
+
+function applyTF(transforms, _static, fixedFrameFromMsg) {
+  if (fixedFrameFromMsg) {
+    fixedFrame = normalizeFrameId(fixedFrameFromMsg) || 'base_link';
+  }
   for (const t of transforms) {
-    tfTree[t.child] = {
-      parent: t.parent,
+    const child = normalizeFrameId(t.child);
+    if (!child) continue;
+    tfTree[child] = {
+      parent: normalizeFrameId(t.parent),
       tx: t.tx, ty: t.ty, tz: t.tz,
       rx: t.rx, ry: t.ry, rz: t.rz, rw: t.rw,
     };
   }
+  updateRobotPoseFromTF();
+}
+
+function getFrameToRootMatrix(frameId) {
+  const chain = [];
+  let f = normalizeFrameId(frameId);
+  const visited = new Set();
+  while (f && tfTree[f] && !visited.has(f)) {
+    visited.add(f);
+    chain.push(tfTree[f]);
+    f = tfTree[f].parent;
+  }
+  const mat = new THREE.Matrix4();
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const t = chain[i];
+    mat.multiply(new THREE.Matrix4().compose(
+      new THREE.Vector3(t.tx, t.ty, t.tz),
+      new THREE.Quaternion(t.rx, t.ry, t.rz, t.rw),
+      new THREE.Vector3(1, 1, 1),
+    ));
+  }
+  return mat;
+}
+
+function getFrameMatrixInFixedFrame(frameId) {
+  const f = normalizeFrameId(frameId);
+  if (!f || f === fixedFrame) return new THREE.Matrix4();
+  if (!tfTree[f]) return null;
+  const rootToFixed = getFrameToRootMatrix(fixedFrame);
+  const rootToFrame = getFrameToRootMatrix(f);
+  return rootToFixed.clone().invert().multiply(rootToFrame);
+}
+
+function updateRobotPoseFromTF() {
+  if (!robotLoaded) return;
+  const frameMat = getFrameMatrixInFixedFrame(robotBaseFrame);
+  if (!frameMat) return;
+  frameMat.decompose(robotRoot.position, robotRoot.quaternion, robotRoot.scale);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -553,32 +621,14 @@ const MK = {
 
 const markerRoot = new THREE.Group();
 markerRoot.name = 'markers';
-scene.add(markerRoot);
+rosSceneRoot.add(markerRoot);
 
 // "ns:id" → Object3D
 const markerObjects = new Map();
 
 // Walk TF chain to compute world-space matrix of a named frame
 function getFrameWorldMatrix(frameId) {
-  const chain = [];
-  let f = frameId;
-  const visited = new Set();
-  while (f && tfTree[f] && !visited.has(f)) {
-    visited.add(f);
-    chain.push(tfTree[f]);
-    f = tfTree[f].parent;
-  }
-  // Compose from root (last) down to frameId (first)
-  const mat = new THREE.Matrix4();
-  for (let i = chain.length - 1; i >= 0; i--) {
-    const t = chain[i];
-    mat.multiply(new THREE.Matrix4().compose(
-      new THREE.Vector3(t.tx, t.ty, t.tz),
-      new THREE.Quaternion(t.rx, t.ry, t.rz, t.rw),
-      new THREE.Vector3(1, 1, 1),
-    ));
-  }
-  return mat;
+  return getFrameMatrixInFixedFrame(frameId) || new THREE.Matrix4();
 }
 
 // Standard MeshStandardMaterial for markers
@@ -911,7 +961,7 @@ function connectWS() {
         break;
 
       case 'tf':
-        applyTF(msg.transforms, msg.static);
+        applyTF(msg.transforms, msg.static, msg.fixed_frame);
         break;
 
       case 'image':

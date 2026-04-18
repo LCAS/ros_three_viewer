@@ -14,7 +14,8 @@ Topics subscribed (all configurable via ROS2 parameters):
 
 WebSocket message format  (all JSON):
   { type: 'joint_states', name: [...], position: [...] }
-  { type: 'tf', static: bool, transforms: [{parent,child,tx,ty,tz,rx,ry,rz,rw},...] }
+  { type: 'tf', static: bool, fixed_frame: str,
+    transforms: [{parent,child,tx,ty,tz,rx,ry,rz,rw},...] }
   { type: 'image',      topic, data: 'data:image/jpeg;base64,...' }
   { type: 'pointcloud', topic, frame_id, count, data: '<base64 packed float32>' }
      data layout: N × [x y z r g b] each a float32 (24 bytes/point)
@@ -93,8 +94,10 @@ class WebViewerNode(Node):
         self.declare_parameter('pointcloud_topics', ['/points'])
         self.declare_parameter('pointcloud_max_points', 8000)
         self.declare_parameter('image_jpeg_quality', 65)
+        self.declare_parameter('fixed_frame', 'base_link')
         self.declare_parameter('target_frame', 'base_link')
         self.declare_parameter('marker_array_topics', ['/markers'])
+        self._fixed_frame = self._resolve_fixed_frame()
 
         # ── Core subscriptions ───────────────────────────────────────────
         self.create_subscription(
@@ -129,6 +132,13 @@ class WebViewerNode(Node):
             self.get_logger().info(f'Subscribed to marker_array topic: {topic}')
 
         self.get_logger().info('ros2_web_viewer node initialised')
+        self.get_logger().info(f'Using fixed frame: {self._fixed_frame}')
+
+    def _resolve_fixed_frame(self) -> str:
+        fixed_frame = str(self.get_parameter('fixed_frame').value or '').strip()
+        target_frame = str(self.get_parameter('target_frame').value or '').strip()
+        selected = fixed_frame or target_frame or 'base_link'
+        return selected.lstrip('/')
 
     # ── Accessors ────────────────────────────────────────────────────────
 
@@ -163,7 +173,12 @@ class WebViewerNode(Node):
                 'rx': ro.x, 'ry': ro.y, 'rz': ro.z, 'rw': ro.w,
             })
         if transforms:
-            payload = {'type': 'tf', 'static': static, 'transforms': transforms}
+            payload = {
+                'type': 'tf',
+                'static': static,
+                'fixed_frame': self._fixed_frame,
+                'transforms': transforms,
+            }
             self._server.broadcast_threadsafe(json.dumps(payload))
 
     def _on_image(self, msg: Image, topic: str):

@@ -28,7 +28,9 @@
     fixed_frame: "base_link"
     target_frame: "base_link"
 
-    html_panel_topic: "/viewer_panel_html"
+    html_panel_topics:
+      - /viewer_panel_html
+    html_routes: "{'/modular': 'examples/modular.html'}"
 
     # ────────────────────────────────────────────────────────────────────────────
     # URDF link display filtering

@@ -26,6 +26,7 @@ setup(
             'image_sim = ros2_web_viewer_example.image_sim:main',
             'marker_sim = ros2_web_viewer_example.marker_sim:main',
             'html_panel_sim = ros2_web_viewer_example.html_panel_sim:main',
+            'trigger_service_sim = ros2_web_viewer_example.trigger_service_sim:main',
         ],
     },
 )

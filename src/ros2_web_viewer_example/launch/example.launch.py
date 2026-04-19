@@ -57,6 +57,10 @@ def generate_launch_description():
             'enable_html_panel_sim', default_value='true',
             description='Launch the simulated HTML panel String publisher'),
 
+        DeclareLaunchArgument(
+            'enable_trigger_service_sim', default_value='true',
+            description='Launch a demo std_srvs/Trigger service for HTML panel buttons'),
+
         # ── UR3e robot description + joint_state_publisher ───────────────
 
         IncludeLaunchDescription(
@@ -112,6 +116,16 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration('enable_html_panel_sim')),
         ),
 
+        # ── Simulated Trigger service for panel buttons ─────────────────────
+
+        Node(
+            package='ros2_web_viewer_example',
+            executable='trigger_service_sim',
+            name='trigger_service_sim',
+            output='screen',
+            condition=IfCondition(LaunchConfiguration('enable_trigger_service_sim')),
+        ),
+
         # ── Web viewer ───────────────────────────────────────────────────
 
         Node(
@@ -127,7 +141,8 @@ def generate_launch_description():
                 'marker_array_topics': ['/markers'],
                 'pointcloud_max_points': 5000,
                 'image_jpeg_quality': 65,
-                'html_panel_topic': '/viewer_panel_html',
+                'html_panel_topics': ['/viewer_panel_html'],
+                'html_routes': "{'/modular': 'examples/modular.html'}",
             }],
         ),
     ])

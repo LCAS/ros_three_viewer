@@ -3,7 +3,9 @@
 Exposes:
   GET  /            → index.html (Three.js viewer)
   GET  /api/urdf    → raw URDF XML (204 if not yet received)
+  POST /api/trigger → call a std_srvs/Trigger service
   GET  /mesh/{pkg}/{path:path} → proxy mesh files from ROS packages
+  GET  <configured html routes> → custom HTML files from web/
   WS   /ws          → bidirectional WebSocket (server → client data stream)
 """
 
@@ -15,7 +17,7 @@ from typing import Callable, Set
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 log = logging.getLogger('ros2_web_viewer.server')
@@ -36,6 +38,8 @@ class ViewerServer:
         self._clients: Set[WebSocket] = set()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._client_init_messages_getter: Callable[[], list[str]] | None = None
+        self._trigger_service_caller: Callable[[str, float], dict] | None = None
+        self._html_routes: dict[str, str] = {}
         self.app = self._build_app()
 
     # ------------------------------------------------------------------
@@ -51,6 +55,30 @@ class ViewerServer:
             if content is None:
                 return Response(status_code=204)
             return Response(content=content, media_type='text/xml')
+
+        @app.post('/api/trigger')
+        async def trigger_service(payload: dict):
+            if self._trigger_service_caller is None:
+                return JSONResponse(
+                    status_code=503,
+                    content={'ok': False, 'error': 'Trigger service bridge is not configured'},
+                )
+
+            service = str(payload.get('service', '')).strip()
+            timeout_sec_raw = payload.get('timeout_sec', 2.0)
+            try:
+                timeout_sec = float(timeout_sec_raw)
+            except (TypeError, ValueError):
+                timeout_sec = 2.0
+            timeout_sec = max(0.1, min(timeout_sec, 30.0))
+
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: self._trigger_service_caller(service, timeout_sec),
+            )
+            status_code = 200 if result.get('ok', False) else 400
+            return JSONResponse(status_code=status_code, content=result)
 
         @app.get('/mesh/{package}/{path:path}')
         async def mesh(package: str, path: str):
@@ -97,10 +125,55 @@ class ViewerServer:
                 self._clients.discard(websocket)
                 log.info('Client disconnected (%d remaining)', len(self._clients))
 
+        for route_path, file_path in self._resolve_static_html_routes().items():
+            async def static_html_page(_request_path: str = file_path):
+                return FileResponse(_request_path, media_type='text/html')
+            app.add_api_route(route_path, static_html_page, methods=['GET'])
+
         # Static files last (catches everything else)
         app.mount('/', StaticFiles(directory=self.web_dir, html=True), name='static')
 
         return app
+
+    def _resolve_static_html_routes(self) -> dict[str, str]:
+        web_root = Path(self.web_dir).resolve()
+        resolved_routes: dict[str, str] = {}
+        for route, rel_path in self._html_routes.items():
+            route_str = str(route or '').strip()
+            path_str = str(rel_path or '').strip()
+            if not route_str.startswith('/'):
+                route_str = f'/{route_str}'
+            if route_str in ('/', '/ws', '/api', '/api/urdf', '/api/trigger'):
+                log.warning('Skipping html route "%s": reserved route', route_str)
+                continue
+            if route_str.startswith('/api/'):
+                log.warning('Skipping html route "%s": reserved API namespace', route_str)
+                continue
+
+            candidate = Path(path_str)
+            if candidate.is_absolute():
+                resolved_file = candidate.resolve()
+            else:
+                resolved_file = (web_root / candidate).resolve()
+
+            if web_root not in resolved_file.parents and resolved_file != web_root:
+                log.warning(
+                    'Skipping html route "%s": path "%s" is outside web root "%s"',
+                    route_str, path_str, web_root)
+                continue
+            if not resolved_file.is_file():
+                log.warning(
+                    'Skipping html route "%s": file "%s" not found',
+                    route_str, resolved_file)
+                continue
+            if resolved_file.suffix.lower() not in ('.html', '.htm'):
+                log.warning(
+                    'Skipping html route "%s": file "%s" is not HTML',
+                    route_str, resolved_file)
+                continue
+
+            resolved_routes[route_str] = str(resolved_file)
+        return resolved_routes
 
     # ------------------------------------------------------------------
     # Broadcasting
@@ -123,6 +196,14 @@ class ViewerServer:
     def set_client_init_messages_getter(self, getter: Callable[[], list[str]]):
         """Register callback used to replay cached state to new WS clients."""
         self._client_init_messages_getter = getter
+
+    def set_trigger_service_caller(self, caller: Callable[[str, float], dict]):
+        """Register callback used by HTTP route /api/trigger."""
+        self._trigger_service_caller = caller
+
+    def set_html_routes(self, routes: dict[str, str]):
+        """Register custom static HTML routes served before static fallback."""
+        self._html_routes = dict(routes)
 
     # ------------------------------------------------------------------
     # Entry point

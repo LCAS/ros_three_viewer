@@ -16,6 +16,7 @@
   <depend>tf2_msgs</depend>
   <depend>tf2_ros</depend>
   <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
   <depend>visualization_msgs</depend>
   <depend>cv_bridge</depend>
 

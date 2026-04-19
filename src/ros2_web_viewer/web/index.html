@@ -22,17 +22,17 @@
     <div id="left-pane">
       <div id="viewer-square">
         <!-- ── Three.js canvas ─────────────────────────────── -->
-        <canvas id="canvas"></canvas>
+        <canvas id="canvas" class="ros-viewer-canvas" data-ros-widget="3d"></canvas>
       </div>
     </div>
 
     <div id="right-pane">
-      <div id="html-panel">
+      <div id="html-panel" data-ros-widget="html-panel">
         <div id="html-panel-header">
           <span>&#x25CF;&nbsp;DYNAMIC PANEL</span>
-          <span id="html-topic-label">—</span>
+          <span id="html-topic-label" data-role="html-topic-label">—</span>
         </div>
-        <div id="html-panel-content">Waiting for ROS HTML content…</div>
+        <div id="html-panel-content" data-role="html-content">Waiting for ROS HTML content…</div>
       </div>
 
       <!-- ── Status panel ───────────────────────────────────── -->

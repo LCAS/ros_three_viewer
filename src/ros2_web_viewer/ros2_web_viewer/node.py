@@ -31,17 +31,20 @@ import json
 import logging
 import math
 import os
+import re
 import threading
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import rclpy
+from rclpy.client import Client
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 
 from sensor_msgs.msg import Image, JointState, PointCloud2
 from std_msgs.msg import String
+from std_srvs.srv import Trigger
 from tf2_msgs.msg import TFMessage
 from visualization_msgs.msg import MarkerArray
 
@@ -111,13 +114,18 @@ class WebViewerNode(Node):
         self._tf_dynamic_cache: dict[str, dict] = {}
         self._marker_cache_lock = threading.Lock()
         self._marker_cache_by_topic: dict[str, dict[str, dict]] = {}
+        self._html_panel_cache_lock = threading.Lock()
+        self._html_panel_cache_by_topic: dict[str, str] = {}
+        self._trigger_clients_lock = threading.Lock()
+        self._trigger_clients: dict[str, Client] = {}
 
         # ── Parameters ──────────────────────────────────────────────────
         self.declare_parameter('image_topics', ['/camera/image_raw'])
         self.declare_parameter('pointcloud_topics', ['/points'])
         self.declare_parameter('pointcloud_max_points', 8000)
         self.declare_parameter('image_jpeg_quality', 65)
-        self.declare_parameter('html_panel_topic', '/viewer_panel_html')
+        self.declare_parameter('html_panel_topics', [])
+        self.declare_parameter('html_routes', '{}')
         self.declare_parameter('fixed_frame', 'base_link')
         self.declare_parameter('target_frame', 'base_link')
         self.declare_parameter('urdf_link_whitelist', [])
@@ -127,6 +135,8 @@ class WebViewerNode(Node):
         self._urdf_link_blacklist = self._resolve_string_list_parameter('urdf_link_blacklist')
         self._fixed_frame = self._resolve_fixed_frame()
         self._server.set_client_init_messages_getter(self._get_ws_init_messages)
+        self._server.set_trigger_service_caller(self._call_trigger_service)
+        self._server.set_html_routes(self._resolve_html_routes_parameter('html_routes'))
 
         # ── Core subscriptions ───────────────────────────────────────────
         self.create_subscription(
@@ -160,12 +170,12 @@ class WebViewerNode(Node):
                 lambda msg, t=topic: self._on_marker_array(msg, t), 5)
             self.get_logger().info(f'Subscribed to marker_array topic: {topic}')
 
-        html_panel_topic = str(self.get_parameter('html_panel_topic').value or '').strip()
-        if html_panel_topic:
+        html_panel_topics = self._resolve_string_list_parameter('html_panel_topics')
+        for topic in html_panel_topics:
             self.create_subscription(
-                String, html_panel_topic,
-                lambda msg, t=html_panel_topic: self._on_html_panel(msg, t), 5)
-            self.get_logger().info(f'Subscribed to html panel topic: {html_panel_topic}')
+                String, topic,
+                lambda msg, t=topic: self._on_html_panel(msg, t), 5)
+            self.get_logger().info(f'Subscribed to html panel topic: {topic}')
 
         self.get_logger().info('ros2_web_viewer node initialised')
         self.get_logger().info(f'Using fixed frame: {self._fixed_frame}')
@@ -221,6 +231,49 @@ class WebViewerNode(Node):
             seen.add(item)
             deduped.append(item)
         return deduped
+
+    def _resolve_html_routes_parameter(self, name: str) -> dict[str, str]:
+        """Return route->path mapping from a dictionary-like parameter value."""
+        try:
+            raw = self.get_parameter(name).value
+        except rclpy.exceptions.ParameterUninitializedException:
+            return {}
+
+        parsed: dict | None = None
+        if isinstance(raw, dict):
+            parsed = raw
+        elif isinstance(raw, str):
+            raw_str = raw.strip()
+            if raw_str:
+                try:
+                    candidate = json.loads(raw_str)
+                    if isinstance(candidate, dict):
+                        parsed = candidate
+                except json.JSONDecodeError:
+                    try:
+                        candidate = ast.literal_eval(raw_str)
+                        if isinstance(candidate, dict):
+                            parsed = candidate
+                    except (ValueError, SyntaxError):
+                        self.get_logger().warning(
+                            f'Invalid html_routes value "{raw_str}" (expected JSON/python dict string)')
+        elif raw:
+            self.get_logger().warning(
+                f'Ignoring html_routes of unsupported type: {type(raw).__name__}')
+
+        if not parsed:
+            return {}
+
+        routes: dict[str, str] = {}
+        for route, path in parsed.items():
+            route_str = str(route or '').strip()
+            path_str = str(path or '').strip()
+            if not route_str or not path_str:
+                continue
+            if not route_str.startswith('/'):
+                route_str = f'/{route_str}'
+            routes[route_str] = path_str
+        return routes
 
     def _filter_urdf_links(self, urdf_xml: str) -> tuple[str, int, int, int]:
         """Filter URDF links using whitelist/blacklist semantics.
@@ -291,6 +344,45 @@ class WebViewerNode(Node):
         selected = fixed_frame or target_frame or 'base_link'
         return selected.lstrip('/')
 
+    def _call_trigger_service(self, service_name: str, timeout_sec: float) -> dict:
+        service = str(service_name or '').strip()
+        timeout = max(0.1, min(float(timeout_sec or 2.0), 30.0))
+        if not service:
+            return {'ok': False, 'error': 'Missing service name'}
+        if not re.fullmatch(r'/[A-Za-z0-9_/]*[A-Za-z0-9_]', service):
+            return {'ok': False, 'error': f'Invalid service name "{service}"'}
+
+        with self._trigger_clients_lock:
+            client = self._trigger_clients.get(service)
+            if client is None:
+                client = self.create_client(Trigger, service)
+                self._trigger_clients[service] = client
+
+        if not client.wait_for_service(timeout_sec=timeout):
+            return {'ok': False, 'error': f'Service "{service}" is unavailable'}
+
+        done = threading.Event()
+        result: dict = {'ok': False}
+
+        future = client.call_async(Trigger.Request())
+
+        def _on_done(fut):
+            try:
+                response = fut.result()
+                success = bool(response.success)
+                result['ok'] = success
+                result['success'] = success
+                result['message'] = str(response.message)
+            except Exception as exc:
+                result['error'] = f'Call failed: {exc}'
+            finally:
+                done.set()
+
+        future.add_done_callback(_on_done)
+        if not done.wait(timeout):
+            return {'ok': False, 'error': f'Service "{service}" timed out'}
+        return result
+
     # ── Accessors ────────────────────────────────────────────────────────
 
     @property
@@ -358,6 +450,8 @@ class WebViewerNode(Node):
                 for topic, marker_map in self._marker_cache_by_topic.items()
                 if marker_map
             }
+        with self._html_panel_cache_lock:
+            html_panel_snapshots = dict(self._html_panel_cache_by_topic)
 
         if static_transforms:
             messages.append(json.dumps({
@@ -380,6 +474,13 @@ class WebViewerNode(Node):
                 'type': 'marker_array',
                 'topic': topic,
                 'markers': markers,
+            }))
+
+        for topic, html_data in html_panel_snapshots.items():
+            messages.append(json.dumps({
+                'type': 'html_panel',
+                'topic': topic,
+                'data': html_data,
             }))
 
         return messages
@@ -486,6 +587,8 @@ class WebViewerNode(Node):
         self._server.broadcast_threadsafe(json.dumps(payload))
 
     def _on_html_panel(self, msg: String, topic: str):
+        with self._html_panel_cache_lock:
+            self._html_panel_cache_by_topic[topic] = msg.data
         payload = {
             'type': 'html_panel',
             'topic': topic,

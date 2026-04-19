@@ -16,6 +16,7 @@ setup(
         # Web assets
         ('share/' + package_name + '/web', glob('web/*.*')),
         ('share/' + package_name + '/web/assets', glob('web/assets/*')),
+        ('share/' + package_name + '/web/examples', glob('web/examples/*')),
     ],
     install_requires=[
         'setuptools',

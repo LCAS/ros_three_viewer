@@ -29,29 +29,18 @@ const WS_RETRY_MS   = 3_000;
 const WS_URL        = `ws://${location.host}/ws`;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Three.js — renderer
+// Widget discovery
 // ─────────────────────────────────────────────────────────────────────────────
 
-const canvas = document.getElementById('canvas');
-const htmlPanelContent = document.getElementById('html-panel-content');
-const htmlTopicLabel = document.getElementById('html-topic-label');
+const threeCanvases = Array.from(document.querySelectorAll('[data-ros-widget="3d"]'));
+if (threeCanvases.length === 0) {
+  throw new Error('No 3D canvas found. Add an element with data-ros-widget="3d".');
+}
 
-const renderer = new THREE.WebGLRenderer({
-  canvas,
-  antialias: true,
-  powerPreference: 'default',
-});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.shadowMap.enabled = false;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-function getCanvasSize() {
+function getCanvasSize(canvasEl) {
   return {
-    width: Math.max(canvas.clientWidth, 1),
-    height: Math.max(canvas.clientHeight, 1),
+    width: Math.max(canvasEl.clientWidth, 1),
+    height: Math.max(canvasEl.clientHeight, 1),
   };
 }
 
@@ -72,38 +61,48 @@ rosSceneRoot.quaternion.copy(ROS_TO_THREE_QUAT);
 scene.add(rosSceneRoot);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Camera & controls
+// Camera, renderer and controls per canvas widget
 // ─────────────────────────────────────────────────────────────────────────────
 
-const camera = new THREE.PerspectiveCamera(55, 1.0, 0.001, 60);
-camera.position.set(2.0, 1.6, 2.0);
-camera.lookAt(0, 0.5, 0);
+const viewerWidgets = threeCanvases.map((canvasEl) => {
+  const renderer = new THREE.WebGLRenderer({
+    canvas: canvasEl,
+    antialias: true,
+    powerPreference: 'default',
+  });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.shadowMap.enabled = false;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 0.4, 0);
-controls.enableDamping = true;
-controls.dampingFactor = 0.06;
-controls.minDistance = 0.1;
-controls.maxDistance = 20;
-controls.autoRotate = true;
-controls.autoRotateSpeed = 0.75;
-controls.update();
+  const camera = new THREE.PerspectiveCamera(55, 1.0, 0.001, 60);
+  camera.position.set(2.0, 1.6, 2.0);
+  camera.lookAt(0, 0.5, 0);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Post-processing  (bloom → output)
-// ─────────────────────────────────────────────────────────────────────────────
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 0.4, 0);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+  controls.minDistance = 0.1;
+  controls.maxDistance = 20;
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.75;
+  controls.update();
 
-const composer = new EffectComposer(renderer);
-composer.addPass(new RenderPass(scene, camera));
+  const composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
 
-const initialCanvasSize = getCanvasSize();
-const bloomPass = new UnrealBloomPass(
-  new THREE.Vector2(initialCanvasSize.width, initialCanvasSize.height),
-  /*strength*/ 0.25, /*radius*/ 0.5, /*threshold*/ 0.88);
-composer.addPass(bloomPass);
+  const initialCanvasSize = getCanvasSize(canvasEl);
+  const bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(initialCanvasSize.width, initialCanvasSize.height),
+    /*strength*/ 0.25, /*radius*/ 0.5, /*threshold*/ 0.88);
+  composer.addPass(bloomPass);
+  composer.addPass(new OutputPass());
 
-const outputPass = new OutputPass();
-composer.addPass(outputPass);
+  return { canvasEl, renderer, camera, controls, composer, bloomPass };
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lighting
@@ -1079,6 +1078,19 @@ const imagePanel       = document.getElementById('image-panel');
 const cameraImg        = document.getElementById('camera-image');
 const imgPlaceholder   = document.getElementById('image-placeholder');
 const imgTopicLabel    = document.getElementById('image-topic-label');
+const htmlPanelWidgets = Array.from(document.querySelectorAll('[data-ros-widget="html-panel"]'))
+  .map((panel) => {
+    const contentEl = panel.querySelector('[data-role="html-content"]');
+    const topicEl = panel.querySelector('[data-role="html-topic-label"]');
+    if (!contentEl || !topicEl) return null;
+    return {
+      panel,
+      contentEl,
+      topicEl,
+      topicFilter: String(panel.getAttribute('data-topic') || '').trim(),
+    };
+  })
+  .filter(Boolean);
 
 function updateImage(dataUri, topic) {
   cameraImg.src = dataUri;
@@ -1107,14 +1119,18 @@ function isSafeUrl(url) {
 const panelSanitizerConfig = {
   allowElements: ['div', 'p', 'span', 'strong', 'em', 'b', 'i', 'u',
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'ul', 'ol', 'li', 'br', 'hr', 'code', 'pre', 'blockquote', 'a'],
+    'ul', 'ol', 'li', 'br', 'hr', 'code', 'pre', 'blockquote', 'a', 'button'],
   allowAttributes: {
     class: ['*'],
+    id: ['*'],
     title: ['*'],
     role: ['*'],
     href: ['a'],
     target: ['a'],
     rel: ['a'],
+    type: ['button'],
+    'data-trigger-service': ['button'],
+    'data-trigger-timeout': ['button'],
   },
 };
 
@@ -1132,17 +1148,61 @@ function normalizePanelLinks(root) {
   }
 }
 
+function bindTriggerButtons(root) {
+  for (const button of root.querySelectorAll('button[data-trigger-service]')) {
+    if (button.dataset.triggerBound === 'true') continue;
+    button.dataset.triggerBound = 'true';
+    button.addEventListener('click', async (evt) => {
+      evt.preventDefault();
+      const service = String(button.getAttribute('data-trigger-service') || '').trim();
+      if (!service) return;
+
+      const timeoutRaw = Number.parseFloat(button.getAttribute('data-trigger-timeout') || '2.0');
+      const timeoutSec = Number.isFinite(timeoutRaw) && timeoutRaw > 0 ? timeoutRaw : 2.0;
+
+      button.disabled = true;
+      button.dataset.triggerState = 'pending';
+      try {
+        const response = await fetch('/api/trigger', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ service, timeout_sec: timeoutSec }),
+        });
+        const payload = await response.json();
+        const ok = Boolean(payload?.ok);
+        button.dataset.triggerState = ok ? 'ok' : 'error';
+        button.title = ok ? String(payload.message || 'Trigger service call succeeded')
+          : String(payload.error || payload.message || 'Trigger service call failed');
+      } catch (err) {
+        button.dataset.triggerState = 'error';
+        button.title = `Trigger service call failed: ${err?.message || err}`;
+      } finally {
+        setTimeout(() => {
+          button.disabled = false;
+          button.dataset.triggerState = '';
+        }, 180);
+      }
+    });
+  }
+}
+
 function updateHtmlPanel(html, topic) {
   const rawHtml = String(html ?? '');
-  if (typeof window.Sanitizer === 'function' && typeof htmlPanelContent.setHTML === 'function') {
-    const sanitizer = new window.Sanitizer(panelSanitizerConfig);
-    htmlPanelContent.setHTML(rawHtml, { sanitizer });
-    normalizePanelLinks(htmlPanelContent);
-  } else {
-    // Degraded fallback for browsers without Sanitizer API support.
-    htmlPanelContent.textContent = rawHtml;
+  for (const widget of htmlPanelWidgets) {
+    if (widget.topicFilter && widget.topicFilter !== topic) continue;
+
+    if (typeof window.Sanitizer === 'function' && typeof widget.contentEl.setHTML === 'function') {
+      const sanitizer = new window.Sanitizer(panelSanitizerConfig);
+      widget.contentEl.setHTML(rawHtml, { sanitizer });
+      normalizePanelLinks(widget.contentEl);
+      bindTriggerButtons(widget.contentEl);
+    } else {
+      // Degraded fallback for browsers without Sanitizer API support.
+      widget.contentEl.textContent = rawHtml;
+    }
+    widget.topicEl.textContent = topic.split('/').pop();
   }
-  htmlTopicLabel.textContent = topic.split('/').pop();
+
   setStatus('html', topic, 'ok');
 }
 
@@ -1211,7 +1271,6 @@ const stFPS = document.getElementById('st-fps');
 
 function animate() {
   requestAnimationFrame(animate);
-  controls.update();
 
   // FPS counter
   frameCount++;
@@ -1227,7 +1286,10 @@ function animate() {
   // Pulse the fill light slightly for a living effect
   fillLight.intensity = 2.3 + 0.4 * Math.sin(now * 0.001);
 
-  composer.render();
+  for (const widget of viewerWidgets) {
+    widget.controls.update();
+    widget.composer.render();
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1235,12 +1297,14 @@ function animate() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 window.addEventListener('resize', () => {
-  const { width, height } = getCanvasSize();
-  camera.aspect = width / height;
-  camera.updateProjectionMatrix();
-  renderer.setSize(width, height, false);
-  composer.setSize(width, height);
-  bloomPass.resolution.set(width, height);
+  for (const widget of viewerWidgets) {
+    const { width, height } = getCanvasSize(widget.canvasEl);
+    widget.camera.aspect = width / height;
+    widget.camera.updateProjectionMatrix();
+    widget.renderer.setSize(width, height, false);
+    widget.composer.setSize(width, height);
+    widget.bloomPass.resolution.set(width, height);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1259,5 +1323,6 @@ setTimeout(() => {
 
 connectWS();
 fetchURDF();
+bindTriggerButtons(document);
 window.dispatchEvent(new Event('resize'));
 animate();

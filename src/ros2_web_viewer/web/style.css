@@ -68,7 +68,8 @@ html, body {
 }
 
 /* ── Canvas ───────────────────────────────────────────────── */
-#canvas {
+#canvas,
+.ros-viewer-canvas {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -222,6 +223,25 @@ html, body {
 #html-panel-content code {
   font-family: var(--mono);
   font-size: 0.8rem;
+}
+
+#html-panel-content button[data-trigger-service] {
+  border: 1px solid var(--brown-light);
+  border-radius: 3px;
+  background: var(--cream);
+  color: #1f2a18;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+#html-panel-content button[data-trigger-service][data-trigger-state="ok"] {
+  border-color: var(--good);
+}
+
+#html-panel-content button[data-trigger-service][data-trigger-state="error"] {
+  border-color: var(--danger);
 }
 
 /* ── Status panel ────────────────────────────────────────── */

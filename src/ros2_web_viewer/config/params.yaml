@@ -31,7 +31,9 @@
     fixed_frame: "base_link"        # TF frame used as world origin (RViz-style)
     target_frame: "base_link"       # Fallback TF frame (used if fixed_frame not set)
 
-    html_panel_topic: "/viewer_panel_html"  # std_msgs/String topic for right-side HTML panel
+    html_panel_topics:
+      - /viewer_panel_html                  # std_msgs/String topics for HTML panel widgets
+    html_routes: "{'/modular': 'examples/modular.html'}"  # Route->html path mapping (paths are relative to web/)
 
     # ────────────────────────────────────────────────────────────────────────────
     # URDF link display filtering (whitelist has precedence over blacklist)

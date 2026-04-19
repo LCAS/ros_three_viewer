@@ -27,6 +27,7 @@ const MAX_CLOUD_PTS = 60_000;
 const URDF_RETRY_MS = 2_000;
 const WS_RETRY_MS   = 3_000;
 const WS_URL        = `ws://${location.host}/ws`;
+const DEFAULT_FPS_THROTTLE_HZ = 5;
 const TRIGGER_TIMEOUT_DEFAULT = 2.0;
 const TRIGGER_TIMEOUT_MIN = 0.1;
 const TRIGGER_TIMEOUT_MAX = 30.0;
@@ -181,10 +182,24 @@ function parse3DTopicConfig(el, displayConfig) {
 function parseUrdfLinkFiltersAttr(el) {
   const whitelist = String(el.getAttribute('data-urdf-link-whitelist') || '').trim();
   const blacklist = String(el.getAttribute('data-urdf-link-blacklist') || '').trim();
-  return {
-    whitelist: whitelist ? new Set(whitelist.split(/\s+/).filter(Boolean)) : null,
-    blacklist: blacklist ? new Set(blacklist.split(/\s+/).filter(Boolean)) : null,
+  const filters = {
+    whitelist: whitelist ? new Set(whitelist.split(/[\s,]+/).filter(Boolean)) : null,
+    blacklist: blacklist ? new Set(blacklist.split(/[\s,]+/).filter(Boolean)) : null,
   };
+
+  console.log('[URDF] Link filters:', {
+    whitelist: filters.whitelist ? [...filters.whitelist] : null,
+    blacklist: filters.blacklist ? [...filters.blacklist] : null,
+  });
+
+  return filters;
+}
+
+function shouldShowUrdfLink(linkName, filters) {
+  if (!filters || (!filters.whitelist && !filters.blacklist)) return true;
+  if (filters.whitelist) return filters.whitelist.has(linkName);
+  if (filters.blacklist) return !filters.blacklist.has(linkName);
+  return true;
 }
 
 function getTopicLayer(kind, topicName) {
@@ -299,6 +314,9 @@ const viewerWidgets = threeCanvases.map((canvasEl) => {
   composer.addPass(new OutputPass());
 
   const urdfLinkFilters = parseUrdfLinkFiltersAttr(canvasEl);
+  const fpsThrottleRaw = parseNumberAttr(canvasEl, 'data-fps-throttle', DEFAULT_FPS_THROTTLE_HZ);
+  const fpsThrottleHz = Math.max(1, fpsThrottleRaw);
+  const frameIntervalMs = 1000 / fpsThrottleHz;
 
   return {
     canvasEl,
@@ -310,6 +328,8 @@ const viewerWidgets = threeCanvases.map((canvasEl) => {
     displayConfig,
     topicConfig,
     urdfLinkFilters,
+    fpsThrottleHz,
+    frameIntervalMs,
   };
 });
 
@@ -719,22 +739,14 @@ async function loadURDF(xmlString, filters = null) {
     const name  = linkEl.getAttribute('name');
     const group = new THREE.Group();
     group.name  = `link_${name}`;
-    createLinkVisuals(linkEl, group);
+    if (shouldShowUrdfLink(name, filters)) {
+      createLinkVisuals(linkEl, group);
+    }
     linkGroups[name] = group;
   }
 
-  // ── Apply link filters (whitelist/blacklist) ──────────────────────────
-  if (filters && (filters.whitelist || filters.blacklist)) {
-    for (const [linkName, linkGroup] of Object.entries(linkGroups)) {
-      let shouldHide = false;
-      if (filters.whitelist) {
-        shouldHide = !filters.whitelist.has(linkName);
-      } else if (filters.blacklist) {
-        shouldHide = filters.blacklist.has(linkName);
-      }
-      linkGroup.visible = !shouldHide;
-    }
-  }
+  // Filtering is applied by selectively creating link visuals. The link/joint
+  // hierarchy is always preserved so transforms and children remain valid.
 
   // ── Collect joints and wire scene graph ───────────────────────────────
   const childLinkNames = new Set();
@@ -764,20 +776,20 @@ async function loadURDF(xmlString, filters = null) {
     jointOriginQuats[jName] = pivot.quaternion.clone();
     jointOriginPos[jName]   = pivot.position.clone();
 
-    // Small teal sphere at each mobile joint origin (visual cue)
-    if (jType !== 'fixed') {
-      const dot = new THREE.Mesh(
-        new THREE.SphereGeometry(0.012, 8, 6),
-        new THREE.MeshStandardMaterial({
-          color: JOINT_SPHERE_COLOR,
-          emissive: JOINT_SPHERE_COLOR,
-          emissiveIntensity: 0.6,
-          metalness: 0.9,
-          roughness: 0.1,
-        }),
-      );
-      pivot.add(dot);
-    }
+    // // Small teal sphere at each mobile joint origin (visual cue)
+    // if (jType !== 'fixed') {
+    //   const dot = new THREE.Mesh(
+    //     new THREE.SphereGeometry(0.012, 8, 6),
+    //     new THREE.MeshStandardMaterial({
+    //       color: JOINT_SPHERE_COLOR,
+    //       emissive: JOINT_SPHERE_COLOR,
+    //       emissiveIntensity: 0.6,
+    //       metalness: 0.9,
+    //       roughness: 0.1,
+    //     }),
+    //   );
+    //   pivot.add(dot);
+    // }
 
     childLinkNames.add(child);
   }
@@ -1658,31 +1670,27 @@ function setStatus(key, text, state) {
 // Animation loop
 // ─────────────────────────────────────────────────────────────────────────────
 
-let lastTime = performance.now();
+let fpsLastTime = performance.now();
 let frameCount = 0;
-let fps = 0;
 const stFPS = document.getElementById('st-fps');
 
-function animate() {
-  requestAnimationFrame(animate);
-
-  // FPS counter
-  frameCount++;
-  const now = performance.now();
-  const dt  = now - lastTime;
-  if (dt >= 1000) {
-    fps = Math.round(frameCount * 1000 / dt);
-    if (stFPS) stFPS.textContent = `${fps} fps`;
-    frameCount = 0;
-    lastTime = now;
-  }
-
-  // Pulse the fill light slightly for a living effect
-  fillLight.intensity = 2.3 + 0.4 * Math.sin(now * 0.001);
+function startWidgetAnimationLoops() {
+  const primaryWidget = viewerWidgets[0] || null;
 
   for (const widget of viewerWidgets) {
-    widget.controls.update(dt * 0.001);
-    widget.composer.render();
+    let widgetLastRenderTime = performance.now() - widget.frameIntervalMs;
+    widget.renderer.setAnimationLoop((now) => {
+      const elapsedSinceRender = now - widgetLastRenderTime;
+      if (elapsedSinceRender < widget.frameIntervalMs) {
+        return;
+      }
+
+      const dt = Math.max(0, elapsedSinceRender);
+      widgetLastRenderTime = now;
+
+      widget.controls.update(dt * 0.001);
+      widget.composer.render();
+    });
   }
 }
 
@@ -1723,4 +1731,4 @@ registerHtmlPanelTopics();
 fetchURDF();
 bindTriggerButtons(document);
 window.dispatchEvent(new Event('resize'));
-animate();
+startWidgetAnimationLoops();

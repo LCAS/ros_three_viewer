@@ -13,15 +13,26 @@ Exposes:
 import asyncio
 import logging
 import os
+import sys
+import time
 from pathlib import Path
 from typing import Callable, Set
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 log = logging.getLogger('ros2_web_viewer.server')
+if not log.handlers:
+    _handler = logging.StreamHandler(stream=sys.stderr)
+    _handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s'))
+    log.addHandler(_handler)
+log.setLevel(logging.INFO)
+log.propagate = True
+log.info('Logging initialized for ros2_web_viewer.server')
+
 
 try:
     from ament_index_python.packages import get_package_share_directory
@@ -50,6 +61,42 @@ class ViewerServer:
 
     def _build_app(self) -> FastAPI:
         app = FastAPI(title='ROS2 Web Viewer', docs_url=None, redoc_url=None)
+
+        @app.middleware('http')
+        async def log_http_requests(request: Request, call_next):
+            start = time.perf_counter()
+            status_code = 500
+            try:
+                response = await call_next(request)
+                status_code = response.status_code
+                return response
+            finally:
+                duration_ms = (time.perf_counter() - start) * 1000.0
+                level = logging.INFO if status_code < 400 else logging.WARNING
+                log.log(
+                    level,
+                    'HTTP %s %s -> %d (%.1f ms)',
+                    request.method,
+                    request.url.path,
+                    status_code,
+                    duration_ms,
+                )
+
+        @app.exception_handler(StarletteHTTPException)
+        async def log_http_exception(request: Request, exc: StarletteHTTPException):
+            log.warning(
+                'HTTP exception %d on %s %s: %s',
+                exc.status_code,
+                request.method,
+                request.url.path,
+                exc.detail,
+            )
+            return JSONResponse(status_code=exc.status_code, content={'detail': exc.detail})
+
+        @app.exception_handler(Exception)
+        async def log_unhandled_exception(request: Request, exc: Exception):
+            log.exception('Unhandled server error on %s %s', request.method, request.url.path)
+            return JSONResponse(status_code=500, content={'detail': 'Internal Server Error'})
 
         @app.get('/api/urdf')
         async def urdf():
@@ -149,7 +196,9 @@ class ViewerServer:
                 return FileResponse(request_path, media_type='text/html')
             return static_html_page
 
+        log.info('Registering %d custom HTML routes', len(self._html_routes))
         for route_path, file_path in self._resolve_static_html_routes().items():
+            log.info('Registering custom HTML route: %s -> %s', route_path, file_path)
             app.add_api_route(
                 route_path,
                 _create_html_route_handler(file_path),
@@ -164,7 +213,9 @@ class ViewerServer:
     def _resolve_static_html_routes(self) -> dict[str, str]:
         web_root = Path(self.web_dir).resolve()
         resolved_routes: dict[str, str] = {}
+        logging.info('Resolving custom HTML routes with web root "%s"', web_root)
         for route, rel_path in self._html_routes.items():
+            log.info('Configuring custom HTML route "%s" -> "%s"', route, rel_path)
             route_str = str(route or '').strip()
             path_str = str(rel_path or '').strip()
             if not route_str.startswith('/'):
@@ -233,7 +284,10 @@ class ViewerServer:
 
     def set_html_routes(self, routes: dict[str, str]):
         """Register custom static HTML routes served before static fallback."""
+        log.info('Updating HTML routes: %s', routes)
         self._html_routes = dict(routes)
+        # Rebuild app so newly configured routes are registered before server start.
+        self.app = self._build_app()
 
     # ------------------------------------------------------------------
     # Entry point

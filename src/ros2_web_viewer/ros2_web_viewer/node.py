@@ -235,19 +235,28 @@ class WebViewerNode(Node):
         try:
             raw = self.get_parameter(name).value
         except rclpy.exceptions.ParameterUninitializedException:
+            self.get_logger().warning(f'HTML routes parameter "{name}" is not yet initialized; no custom routes will be registered')
             return {}
 
         parsed: dict | None = None
         if isinstance(raw, dict):
             parsed = raw
+            self.get_logger().info(f'Using HTML routes from parameter "{name}" (dict with {len(parsed)} entries)')
         elif isinstance(raw, str):
             raw_str = raw.strip()
+            self.get_logger().info(f'Parsing HTML routes from parameter "{name}" (string with length {len(raw_str)})')
             if raw_str:
                 try:
                     candidate = json.loads(raw_str)
                     if isinstance(candidate, dict):
                         parsed = candidate
+                        self.get_logger().info(f'Using HTML routes from parameter "{name}" (JSON string with {len(parsed)} entries)')
+                    else:
+                        self.get_logger().warning(
+                            f'Invalid html_routes value "{raw_str}" (expected JSON dict string)')
                 except json.JSONDecodeError:
+                    self.get_logger().warning(
+                        f'Failed to parse html_routes parameter "{name}" as JSON; trying Python literal_eval fallback')
                     try:
                         candidate = ast.literal_eval(raw_str)
                         if isinstance(candidate, dict):

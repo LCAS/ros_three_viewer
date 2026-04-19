@@ -141,7 +141,7 @@ def generate_launch_description():
                 'marker_array_topics': ['/markers'],
                 'pointcloud_max_points': 5000,
                 'image_jpeg_quality': 65,
-                'html_routes': "{'/modular': 'examples/modular.html'}",
+                'html_routes': '{"/modular": "examples/modular.html"}',
             }],
         ),
     ])

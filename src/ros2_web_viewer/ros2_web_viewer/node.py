@@ -8,6 +8,7 @@ Topics subscribed (all configurable via ROS2 parameters):
   /joint_states           sensor_msgs/JointState            → JSON message type 'joint_states'
   /tf                     tf2_msgs/TFMessage                → JSON message type 'tf'
   /tf_static              tf2_msgs/TFMessage                → JSON message type 'tf' (static=true)
+  <html_panel_topics>     std_msgs/String                   → JSON message type 'html_panel' (registered by web widgets)
   <image_topics>          sensor_msgs/Image                 → JSON message type 'image' (JPEG base64)
   <pointcloud_topics>     sensor_msgs/PointCloud2           → JSON message type 'pointcloud' (binary b64)
   <marker_array_topics>   visualization_msgs/MarkerArray    → JSON message type 'marker_array'
@@ -118,6 +119,8 @@ class WebViewerNode(Node):
         self._marker_cache_by_topic: dict[str, dict[str, dict]] = {}
         self._html_panel_cache_lock = threading.Lock()
         self._html_panel_cache_by_topic: dict[str, str] = {}
+        self._html_panel_subscriptions_lock = threading.Lock()
+        self._html_panel_subscriptions: dict[str, object] = {}
         self._trigger_clients_lock = threading.Lock()
         self._trigger_clients: dict[str, Client] = {}
 
@@ -126,7 +129,6 @@ class WebViewerNode(Node):
         self.declare_parameter('pointcloud_topics', ['/points'])
         self.declare_parameter('pointcloud_max_points', 8000)
         self.declare_parameter('image_jpeg_quality', 65)
-        self.declare_parameter('html_panel_topics', [])
         self.declare_parameter('html_routes', '{}')
         self.declare_parameter('fixed_frame', 'base_link')
         self.declare_parameter('target_frame', 'base_link')
@@ -138,6 +140,7 @@ class WebViewerNode(Node):
         self._fixed_frame = self._resolve_fixed_frame()
         self._server.set_client_init_messages_getter(self._get_ws_init_messages)
         self._server.set_trigger_service_caller(self._call_trigger_service)
+        self._server.set_html_panel_topic_registrar(self.register_html_panel_topic)
         self._server.set_html_routes(self._resolve_html_routes_parameter('html_routes'))
 
         # ── Core subscriptions ───────────────────────────────────────────
@@ -171,13 +174,6 @@ class WebViewerNode(Node):
                 MarkerArray, topic,
                 lambda msg, t=topic: self._on_marker_array(msg, t), 5)
             self.get_logger().info(f'Subscribed to marker_array topic: {topic}')
-
-        html_panel_topics = self._resolve_string_list_parameter('html_panel_topics')
-        for topic in html_panel_topics:
-            self.create_subscription(
-                String, topic,
-                lambda msg, t=topic: self._on_html_panel(msg, t), 5)
-            self.get_logger().info(f'Subscribed to html panel topic: {topic}')
 
         self.get_logger().info('ros2_web_viewer node initialised')
         self.get_logger().info(f'Using fixed frame: {self._fixed_frame}')
@@ -384,6 +380,27 @@ class WebViewerNode(Node):
         if not done.wait(timeout):
             return {'ok': False, 'error': f'Service "{service}" timed out'}
         return result
+
+    def register_html_panel_topic(self, topic_name: str) -> dict:
+        topic = str(topic_name or '').strip()
+        if not topic:
+            return {'ok': False, 'error': 'Missing topic name'}
+        if not re.fullmatch(r'/([A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*)', topic):
+            return {'ok': False, 'error': 'Invalid topic name'}
+
+        with self._html_panel_subscriptions_lock:
+            if topic in self._html_panel_subscriptions:
+                return {'ok': True, 'topic': topic, 'registered': False}
+            sub = self.create_subscription(
+                String,
+                topic,
+                lambda msg, t=topic: self._on_html_panel(msg, t),
+                5,
+            )
+            self._html_panel_subscriptions[topic] = sub
+
+        self.get_logger().info(f'Subscribed to html panel topic: {topic}')
+        return {'ok': True, 'topic': topic, 'registered': True}
 
     # ── Accessors ────────────────────────────────────────────────────────
 

@@ -18,13 +18,35 @@
   <div id="app-layout">
     <div id="left-pane">
       <div id="viewer-square">
-        <canvas class="ros-viewer-canvas" data-ros-widget="3d"></canvas>
+        <canvas
+          class="ros-viewer-canvas"
+          data-ros-widget="3d"
+          data-camera-position="2.0 1.6 2.0"
+          data-camera-look-at="0 0.5 0"
+          data-controls-target="0 0.4 0"
+          data-controls-enable-damping="true"
+          data-controls-damping-factor="0.06"
+          data-controls-min-distance="0.1"
+          data-controls-max-distance="20"
+          data-controls-auto-rotate="true"
+          data-controls-auto-rotate-speed="0.75"></canvas>
       </div>
     </div>
 
     <div id="right-pane">
       <div style="position: relative; width: 100%; min-height: 240px; border: 1px solid rgba(224, 220, 169, 0.20); border-radius: 4px; overflow: hidden; background: rgba(0, 0, 0, 0.15);">
-        <canvas class="ros-viewer-canvas" data-ros-widget="3d"></canvas>
+        <canvas
+          class="ros-viewer-canvas"
+          data-ros-widget="3d"
+          data-camera-position="2.0 1.6 2.0"
+          data-camera-look-at="0 0.5 0"
+          data-controls-target="0 0.4 0"
+          data-controls-enable-damping="true"
+          data-controls-damping-factor="0.06"
+          data-controls-min-distance="0.1"
+          data-controls-max-distance="20"
+          data-controls-auto-rotate="true"
+          data-controls-auto-rotate-speed="0.75"></canvas>
       </div>
 
       <div id="html-panel" data-ros-widget="html-panel" data-topic="/viewer_panel_html">

@@ -65,7 +65,7 @@ Then open **http://localhost:8080** in a browser.
 | `/joint_states` | `sensor_msgs/JointState` | |
 | `/tf` | `tf2_msgs/TFMessage` | |
 | `/tf_static` | `tf2_msgs/TFMessage` | latching QoS |
-| `<html_panel_topics>` | `std_msgs/String` | one or more HTML widget topics |
+| `<data-topic attributes in HTML panel widgets>` | `std_msgs/String` | topics registered dynamically by frontend |
 | `<image_topics>` | `sensor_msgs/Image` | configurable list |
 | `<pointcloud_topics>` | `sensor_msgs/PointCloud2` | configurable list |
 
@@ -97,7 +97,6 @@ For a complete, well-documented list of all parameters with explanations, see [c
 | `marker_array_topics` | `['/markers']` | `visualization_msgs/MarkerArray` topics to render |
 | `pointcloud_max_points` | `8000` | Cloud downsampling limit |
 | `image_jpeg_quality` | `65` | JPEG quality (1–100) |
-| `html_panel_topics` | `['/viewer_panel_html']` | `std_msgs/String` topics for HTML panel widgets |
 | `html_routes` | `{'/modular': 'examples/modular.html'}` | route→HTML file mapping (file paths relative to `web/`) |
 | `fixed_frame` | `base_link` | TF frame used as world origin (RViz-style) |
 | `target_frame` | `base_link` | Fallback TF frame if `fixed_frame` not set |
@@ -106,7 +105,7 @@ For a complete, well-documented list of all parameters with explanations, see [c
 
 **URDF filtering precedence:** whitelist (if non-empty) > blacklist (if non-empty) > no filtering.
 
-`html_panel_topics` content is rendered by widgets using `data-ros-widget="html-panel"` (optionally filtered by `data-topic`). It uses the browser Sanitizer API when available (with a safe plain-text fallback).
+`data-ros-widget="html-panel"` widgets register their `data-topic` dynamically via `/api/register_html_panel_topic`. The content is sanitized with the browser Sanitizer API when available (with a safe plain-text fallback).
 
 Buttons using `<button data-trigger-service="/my_service">` call `std_srvs/Trigger` through `POST /api/trigger`.
 

@@ -47,6 +47,34 @@ function getCanvasSize(canvasEl) {
   };
 }
 
+function parseNumberAttr(el, attrName, defaultValue) {
+  const raw = el.getAttribute(attrName);
+  if (raw == null || raw === '') return defaultValue;
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) ? parsed : defaultValue;
+}
+
+function parseBoolAttr(el, attrName, defaultValue) {
+  const raw = el.getAttribute(attrName);
+  if (raw == null || raw === '') return defaultValue;
+  const normalized = String(raw).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return defaultValue;
+}
+
+function parseVector3Attr(el, attrName, fallback) {
+  const raw = el.getAttribute(attrName);
+  const rawTrimmed = String(raw || '').trim();
+  if (!rawTrimmed) return [...fallback];
+  const parsed = rawTrimmed
+    .split(/[,\s]+/)
+    .map(v => Number.parseFloat(v))
+    .filter(v => Number.isFinite(v));
+  if (parsed.length !== 3) return [...fallback];
+  return parsed;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Scene
 // ─────────────────────────────────────────────────────────────────────────────
@@ -80,18 +108,25 @@ const viewerWidgets = threeCanvases.map((canvasEl) => {
   renderer.shadowMap.enabled = false;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-  const camera = new THREE.PerspectiveCamera(55, 1.0, 0.001, 60);
-  camera.position.set(2.0, 1.6, 2.0);
-  camera.lookAt(0, 0.5, 0);
+  const cameraFov = parseNumberAttr(canvasEl, 'data-camera-fov', 55);
+  const cameraNear = parseNumberAttr(canvasEl, 'data-camera-near', 0.001);
+  const cameraFar = parseNumberAttr(canvasEl, 'data-camera-far', 60);
+  const [cameraX, cameraY, cameraZ] = parseVector3Attr(canvasEl, 'data-camera-position', [2.0, 1.6, 2.0]);
+  const [lookAtX, lookAtY, lookAtZ] = parseVector3Attr(canvasEl, 'data-camera-look-at', [0, 0.5, 0]);
+
+  const camera = new THREE.PerspectiveCamera(cameraFov, 1.0, cameraNear, cameraFar);
+  camera.position.set(cameraX, cameraY, cameraZ);
+  camera.lookAt(lookAtX, lookAtY, lookAtZ);
 
   const controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(0, 0.4, 0);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.06;
-  controls.minDistance = 0.1;
-  controls.maxDistance = 20;
-  controls.autoRotate = true;
-  controls.autoRotateSpeed = 0.75;
+  const [targetX, targetY, targetZ] = parseVector3Attr(canvasEl, 'data-controls-target', [0, 0.4, 0]);
+  controls.target.set(targetX, targetY, targetZ);
+  controls.enableDamping = parseBoolAttr(canvasEl, 'data-controls-enable-damping', true);
+  controls.dampingFactor = parseNumberAttr(canvasEl, 'data-controls-damping-factor', 0.06);
+  controls.minDistance = parseNumberAttr(canvasEl, 'data-controls-min-distance', 0.1);
+  controls.maxDistance = parseNumberAttr(canvasEl, 'data-controls-max-distance', 20);
+  controls.autoRotate = parseBoolAttr(canvasEl, 'data-controls-auto-rotate', true);
+  controls.autoRotateSpeed = parseNumberAttr(canvasEl, 'data-controls-auto-rotate-speed', 0.75);
   controls.update();
 
   const composer = new EffectComposer(renderer);
@@ -1096,6 +1131,10 @@ const htmlPanelWidgets = Array.from(document.querySelectorAll('[data-ros-widget=
   .filter(Boolean);
 
 function updateImage(dataUri, topic) {
+  if (!imagePanel || !cameraImg || !imgPlaceholder || !imgTopicLabel) {
+    setStatus('image', topic, 'ok');
+    return;
+  }
   cameraImg.src = dataUri;
   cameraImg.style.display = 'block';
   imgPlaceholder.style.display = 'none';
@@ -1215,6 +1254,33 @@ function updateHtmlPanel(html, topic) {
   setStatus('html', topic, 'ok');
 }
 
+async function registerHtmlPanelTopics() {
+  const topics = [...new Set(htmlPanelWidgets
+    .map(widget => widget.topicFilter)
+    .filter(topic => topic && topic.startsWith('/')))];
+  for (const topic of topics) {
+    try {
+      const response = await fetch('/api/register_html_panel_topic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic }),
+      });
+      if (!response.ok) {
+        let detail = '';
+        try {
+          const payload = await response.json();
+          detail = payload?.error ? `: ${payload.error}` : '';
+        } catch {
+          // ignore parse errors for non-JSON responses
+        }
+        console.warn(`[HTML] Failed to register panel topic "${topic}"${detail}`);
+      }
+    } catch (err) {
+      console.warn(`[HTML] Failed to register panel topic "${topic}":`, err);
+    }
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // URDF fetching (polls until robot_description arrives)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1252,6 +1318,7 @@ const elWsDot   = document.getElementById('ws-dot');
 const elWsLabel = document.getElementById('ws-label');
 
 function setWsStatus(connected) {
+  if (!elWsDot || !elWsLabel) return;
   elWsDot.classList.toggle('connected', connected);
   elWsLabel.textContent = connected ? 'LIVE' : 'OFFLINE';
 }
@@ -1287,7 +1354,7 @@ function animate() {
   const dt  = now - lastTime;
   if (dt >= 1000) {
     fps = Math.round(frameCount * 1000 / dt);
-    stFPS.textContent = `${fps} fps`;
+    if (stFPS) stFPS.textContent = `${fps} fps`;
     frameCount = 0;
     lastTime = now;
   }
@@ -1321,16 +1388,19 @@ window.addEventListener('resize', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const loadingEl = document.getElementById('loading');
-setTimeout(() => {
-  loadingEl.classList.add('fade-out');
-  setTimeout(() => loadingEl.remove(), 900);
-}, 2000);
+if (loadingEl) {
+  setTimeout(() => {
+    loadingEl.classList.add('fade-out');
+    setTimeout(() => loadingEl.remove(), 900);
+  }, 2000);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Start
 // ─────────────────────────────────────────────────────────────────────────────
 
 connectWS();
+registerHtmlPanelTopics();
 fetchURDF();
 bindTriggerButtons(document);
 window.dispatchEvent(new Event('resize'));

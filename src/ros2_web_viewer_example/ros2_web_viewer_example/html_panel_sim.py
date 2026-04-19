@@ -32,6 +32,10 @@ class HtmlPanelSimNode(Node):
             '<h2 style="margin: 0 0 8px 0;">ROS Live Panel</h2>'
             '<p style="margin: 0 0 10px 0;">Dynamic HTML received from '
             '<code>/viewer_panel_html</code>.</p>'
+            '<p style="margin: 0 0 10px 0;">'
+            '<button data-trigger-service="/viewer_demo/trigger" '
+            'data-trigger-timeout="2.5">Call /viewer_demo/trigger</button>'
+            '</p>'
             f'<p style="margin: 0;"><strong>Uptime:</strong> {t:0.1f}s</p>'
             '</div>'
         )

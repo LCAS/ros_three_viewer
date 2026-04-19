@@ -9,6 +9,8 @@ This repository contains the **`ros2_web_viewer`** ROS2 package — a web-based 
 - TF2 frame transforms (`/tf` and `/tf_static`)
 - Point cloud visualisation with viridis colourmap and GLSL glow shader
 - Camera image stream (JPEG-compressed bridge)
+- Modular widget architecture (`data-ros-widget`) for multiple 3D canvases and HTML panels per page
+- HTML panel buttons can call ROS `std_srvs/Trigger` services via `data-trigger-service`
 - Auto-reconnecting WebSocket client
 - Chelsea Flower Show botanical theme (warm earth palette, Playfair Display serif font)
 

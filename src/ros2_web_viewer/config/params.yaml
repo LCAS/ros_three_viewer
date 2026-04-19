@@ -7,43 +7,29 @@
     port: 8080                      # Port for the HTTP/WebSocket server
 
     # ────────────────────────────────────────────────────────────────────────────
-    # Topics to bridge — adjust to your robot's topic names
-    # ────────────────────────────────────────────────────────────────────────────
-    image_topics:
-      - /camera/image_raw           # sensor_msgs/Image topics to display in viewer
-      - /camera/color/image_raw      # RealSense camera RGB image
-      # - /camera/rgb/image_raw
-      # - /realsense/color/image_raw
-
-    pointcloud_topics:
-      - /points                     # sensor_msgs/PointCloud2 topics to render
-      - /integrated_cloud             # Integrated point cloud from fusion module
-      # - /velodyne_points
-      # - /realsense/depth/color/points
-
-    marker_array_topics:
-      - /markers                    # visualization_msgs/MarkerArray topics to render
-      # - /planning_markers
-
-    # ────────────────────────────────────────────────────────────────────────────
     # URDF & TF configuration
     # ────────────────────────────────────────────────────────────────────────────
     fixed_frame: "base_link"        # TF frame used as world origin (RViz-style)
     target_frame: "base_link"       # Fallback TF frame (used if fixed_frame not set)
 
-    html_panel_topic: "/viewer_panel_html"  # std_msgs/String topic for right-side HTML panel
+    html_routes: "{'/': 'index.html', '/modular': 'examples/modular.html'}"  # Route->html path mapping (relative to web/, absolute, or use @package_name@ substitution)
 
     # ────────────────────────────────────────────────────────────────────────────
-    # URDF link display filtering (whitelist has precedence over blacklist)
-    # When whitelist is non-empty, ONLY those links are displayed.
-    # When whitelist is empty and blacklist is non-empty, those links are hidden.
-    # When both are empty, all links are displayed.
-    # ────────────────────────────────────────────────────────────────────────────
-    urdf_link_whitelist: []         # List of URDF link names to display (priority over blacklist)
-    urdf_link_blacklist: []         # List of URDF link names to hide (ignored if whitelist non-empty)
+    # URDF link display filtering is controlled per-canvas via HTML attributes:
+    #   data-urdf-link-whitelist="link1 link2 ..."  (space-separated, only show these)
+    #   data-urdf-link-blacklist="link1 link2 ..."  (space-separated, hide these)
+    #   - "base"
+    #   - "flange"
+    #   - "tool0"
 
     # ────────────────────────────────────────────────────────────────────────────
     # Performance & rendering
     # ────────────────────────────────────────────────────────────────────────────
+    joint_states_broadcast_hz: 1.0  # Joint state websocket broadcast rate (<=0 disables throttling)
+    tf_broadcast_hz: 1.0            # Dynamic TF websocket broadcast rate (<=0 disables throttling)
+    image_broadcast_hz: 1.0         # Default image topic websocket broadcast rate (<=0 disables throttling)
+    pointcloud_broadcast_hz: 1.0    # Default point cloud topic websocket broadcast rate (<=0 disables throttling)
+    image_topic_broadcast_hz: "{}"       # Optional per-topic image rates as JSON/Python dict, e.g. {'/cam/front': 2.0}
+    pointcloud_topic_broadcast_hz: "{}"  # Optional per-topic point cloud rates as JSON/Python dict, e.g. {'/points': 0.5}
     pointcloud_max_points: 8000     # Maximum points per cloud (heavier clouds are downsampled)
     image_jpeg_quality: 65          # JPEG quality for compressed image bridge (1-100; lower = faster but blurrier)

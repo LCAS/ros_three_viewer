@@ -17,7 +17,7 @@ Open http://localhost:8080 in a browser once everything is running.
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition
-from launch.launch_description_sources import AnyLaunchDescriptionSource
+from launch.launch_description_sources import AnyLaunchDescriptionSource, PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -34,12 +34,13 @@ def generate_launch_description():
             description='UR robot type (e.g. ur3e, ur5e, ur10e)'),
 
         DeclareLaunchArgument(
-            'host', default_value='0.0.0.0',
-            description='Web server bind address'),
-
-        DeclareLaunchArgument(
-            'port', default_value='8080',
-            description='Web server port'),
+            'params_file',
+            default_value=PathJoinSubstitution([
+                FindPackageShare('ros2_web_viewer_example'),
+                'config',
+                'params.yaml',
+            ]),
+            description='Path to ros2_web_viewer parameters YAML for this example'),
 
         DeclareLaunchArgument(
             'enable_pointcloud_sim', default_value='false',
@@ -56,6 +57,10 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'enable_html_panel_sim', default_value='true',
             description='Launch the simulated HTML panel String publisher'),
+
+        DeclareLaunchArgument(
+            'enable_trigger_service_sim', default_value='true',
+            description='Launch a demo std_srvs/Trigger service for HTML panel buttons'),
 
         # ── UR3e robot description + joint_state_publisher ───────────────
 
@@ -112,22 +117,28 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration('enable_html_panel_sim')),
         ),
 
-        # ── Web viewer ───────────────────────────────────────────────────
+        # ── Simulated Trigger service for panel buttons ─────────────────────
 
         Node(
-            package='ros2_web_viewer',
-            executable='ros2_web_viewer',
-            name='ros2_web_viewer',
+            package='ros2_web_viewer_example',
+            executable='trigger_service_sim',
+            name='trigger_service_sim',
             output='screen',
-            parameters=[{
-                'host': LaunchConfiguration('host'),
-                'port': LaunchConfiguration('port'),
-                'image_topics': ['/camera/image_raw'],
-                'pointcloud_topics': ['/points'],
-                'marker_array_topics': ['/markers'],
-                'pointcloud_max_points': 5000,
-                'image_jpeg_quality': 65,
-                'html_panel_topic': '/viewer_panel_html',
-            }],
+            condition=IfCondition(LaunchConfiguration('enable_trigger_service_sim')),
+        ),
+
+        # ── Web viewer (via shared launcher) ──────────────────────────────
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([
+                    FindPackageShare('ros2_web_viewer'),
+                    'launch',
+                    'viewer.launch.py',
+                ]),
+            ]),
+            launch_arguments={
+                'params_file': LaunchConfiguration('params_file'),
+            }.items(),
         ),
     ])

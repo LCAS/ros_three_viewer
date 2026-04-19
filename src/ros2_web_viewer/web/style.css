@@ -68,7 +68,8 @@ html, body {
 }
 
 /* ── Canvas ───────────────────────────────────────────────── */
-#canvas {
+#canvas,
+.ros-viewer-canvas {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -82,10 +83,10 @@ html, body {
   inset: 0;
   background-color: #d8d0a8;
   background-image:
-    url('assets/background.jpg'),
+    url('/assets/assets/background.jpg'),
     radial-gradient(ellipse 120% 80% at 10% 90%, rgba(74,65,51,0.35) 0%, transparent 60%),
     radial-gradient(ellipse 80% 120% at 90% 85%, rgba(100,120,80,0.25) 0%, transparent 55%),
-    url('assets/noise.svg');
+    url('/assets/assets/noise.svg');
   background-size: cover, cover, cover, 300px 300px;
   background-position: center, center, center, 0 0;
   opacity: 0.20;
@@ -224,63 +225,24 @@ html, body {
   font-size: 0.8rem;
 }
 
-/* ── Status panel ────────────────────────────────────────── */
-#status-panel {
-  width: 100%;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
-  backdrop-filter: var(--panel-blur);
-  overflow: hidden;
-}
-
-#status-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
-  border-bottom: 1px solid var(--panel-border);
-  font-family: var(--mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--cream);
-}
-#status-header::before {
-  content: '';
-  display: block;
-  width: 2px; height: 12px;
+#html-panel-content button[data-trigger-service] {
+  border: 1px solid var(--brown-light);
+  border-radius: 3px;
   background: var(--cream);
-  border-radius: 1px;
-}
-
-.status-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 5px 12px;
+  color: #1f2a18;
   font-family: var(--mono);
-  font-size: 0.62rem;
-  border-bottom: 1px solid rgba(224,220,169,0.06);
+  font-size: 0.7rem;
+  padding: 4px 8px;
+  cursor: pointer;
 }
-.status-row:last-child { border-bottom: none; }
 
-.status-label {
-  color: var(--cream-dim);
-  flex-shrink: 0;
-  width: 60px;
-  letter-spacing: 0.06em;
+#html-panel-content button[data-trigger-service][data-trigger-state="ok"] {
+  border-color: var(--good);
 }
-.status-value {
-  color: var(--cream);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+
+#html-panel-content button[data-trigger-service][data-trigger-state="error"] {
+  border-color: var(--danger);
 }
-.status-value.ok   { color: var(--good); }
-.status-value.warn { color: var(--warn); }
-.status-value.bad  { color: var(--danger); }
 
 /* ── Image panel ─────────────────────────────────────────── */
 #image-panel {

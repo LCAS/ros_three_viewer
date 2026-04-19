@@ -10,25 +10,12 @@
     port: 8080
 
     # ────────────────────────────────────────────────────────────────────────────
-    # Topics — PhenAIx-specific sensor/integration pipeline topics
-    # ────────────────────────────────────────────────────────────────────────────
-    image_topics:
-      - /camera/color/image_raw      # RealSense camera RGB image
-
-    pointcloud_topics:
-      - /integrated_cloud             # Integrated point cloud from fusion module
-
-    marker_array_topics:
-      # - /planning_markers           # Uncomment if using planning visualizations
-      # - /detection_markers
-
-    # ────────────────────────────────────────────────────────────────────────────
     # URDF & TF configuration
     # ────────────────────────────────────────────────────────────────────────────
     fixed_frame: "base_link"
     target_frame: "base_link"
 
-    html_panel_topic: "/viewer_panel_html"
+    html_routes: "{'/': 'index.html', '/modular': 'examples/modular.html'}"
 
     # ────────────────────────────────────────────────────────────────────────────
     # URDF link display filtering

@@ -16,6 +16,7 @@ setup(
         # Web assets
         ('share/' + package_name + '/web', glob('web/*.*')),
         ('share/' + package_name + '/web/assets', glob('web/assets/*')),
+        ('share/' + package_name + '/web/examples', glob('web/examples/*')),
     ],
     install_requires=[
         'setuptools',
@@ -32,6 +33,7 @@ setup(
     entry_points={
         'console_scripts': [
             'ros2_web_viewer = ros2_web_viewer.node:main',
+            'list_urdf_links = ros2_web_viewer.list_urdf_links:main',
         ],
     },
 )

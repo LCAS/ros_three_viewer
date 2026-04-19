@@ -12,6 +12,9 @@ setup(
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', glob('launch/*.py')),
+        ('share/' + package_name + '/web', glob('web/*.*')),
+        ('share/' + package_name + '/config', glob('config/*.yaml')),
+        ('share/' + package_name + '/web/examples', glob('web/examples/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -26,6 +29,7 @@ setup(
             'image_sim = ros2_web_viewer_example.image_sim:main',
             'marker_sim = ros2_web_viewer_example.marker_sim:main',
             'html_panel_sim = ros2_web_viewer_example.html_panel_sim:main',
+            'trigger_service_sim = ros2_web_viewer_example.trigger_service_sim:main',
         ],
     },
 )

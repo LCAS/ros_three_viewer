@@ -1,0 +1,23 @@
+/**:
+  ros__parameters:
+    # Example-specific defaults for ros2_web_viewer_example.
+    host: "0.0.0.0"
+    port: 8080
+
+    fixed_frame: "base_link"
+    target_frame: "base_link"
+
+    html_routes: '{"/": "index.html", "/modular": "@ros2_web_viewer_example@/web/examples/modular.html"}'
+
+    # Throttle websocket broadcasts to reduce per-client traffic.
+    joint_states_broadcast_hz: 1.0
+    tf_broadcast_hz: 1.0
+    image_broadcast_hz: 1.0
+    pointcloud_broadcast_hz: 1.0
+
+    # Optional per-topic overrides (topic -> Hz). Leave empty by default.
+    image_topic_broadcast_hz: "{}"
+    pointcloud_topic_broadcast_hz: "{}"
+
+    pointcloud_max_points: 5000
+    image_jpeg_quality: 65

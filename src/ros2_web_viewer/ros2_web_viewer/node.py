@@ -8,9 +8,11 @@ Topics subscribed (all configurable via ROS2 parameters):
   /joint_states           sensor_msgs/JointState            → JSON message type 'joint_states'
   /tf                     tf2_msgs/TFMessage                → JSON message type 'tf'
   /tf_static              tf2_msgs/TFMessage                → JSON message type 'tf' (static=true)
-  <image_topics>          sensor_msgs/Image                 → JSON message type 'image' (JPEG base64)
-  <pointcloud_topics>     sensor_msgs/PointCloud2           → JSON message type 'pointcloud' (binary b64)
-  <marker_array_topics>   visualization_msgs/MarkerArray    → JSON message type 'marker_array'
+    <viewer topics requested by 3D widgets>                  → dynamic subscriptions via /api/register_viewer_topics
+  <html_panel_topics>     std_msgs/String                   → JSON message type 'html_panel' (registered by web widgets)
+    <image topics requested by widgets>                      → JSON message type 'image' (JPEG base64)
+    <pointcloud topics requested by widgets>                 → JSON message type 'pointcloud' (binary b64)
+    <marker topics requested by widgets>                     → JSON message type 'marker_array'
 
 WebSocket message format  (all JSON):
   { type: 'joint_states', name: [...], position: [...] }
@@ -29,24 +31,32 @@ import base64
 import ast
 import json
 import logging
-import math
 import os
+import re
 import threading
-import xml.etree.ElementTree as ET
+import time
 from pathlib import Path
 
 import rclpy
+from rclpy.client import Client
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 
 from sensor_msgs.msg import Image, JointState, PointCloud2
 from std_msgs.msg import String
+from std_srvs.srv import Trigger
 from tf2_msgs.msg import TFMessage
 from visualization_msgs.msg import MarkerArray
 
 from .pc2_utils import decode_pointcloud2
 from .server import ViewerServer
+
+try:
+    from ament_index_python.packages import get_package_share_directory
+    _HAS_AMENT = True
+except ImportError:
+    _HAS_AMENT = False
 
 log = logging.getLogger('ros2_web_viewer.node')
 log.setLevel(logging.INFO)
@@ -58,6 +68,10 @@ _LATCHING_QOS = QoSProfile(
     reliability=QoSReliabilityPolicy.RELIABLE,
     durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
 )
+_TRIGGER_TIMEOUT_MIN = 0.1
+_TRIGGER_TIMEOUT_MAX = 30.0
+_SENSOR_THROTTLE_CHECK_PERIOD_SEC = 0.1
+_ROS_PACKAGE_SUBSTITUTION_RE = re.compile(r'@([a-zA-Z0-9_]+)@')
 
 
 # ---------------------------------------------------------------------------
@@ -109,24 +123,74 @@ class WebViewerNode(Node):
         self._tf_cache_lock = threading.Lock()
         self._tf_static_cache: dict[str, dict] = {}
         self._tf_dynamic_cache: dict[str, dict] = {}
+        self._joint_state_cache_lock = threading.Lock()
+        self._joint_state_latest_payload: dict | None = None
         self._marker_cache_lock = threading.Lock()
         self._marker_cache_by_topic: dict[str, dict[str, dict]] = {}
+        self._html_panel_cache_lock = threading.Lock()
+        self._html_panel_cache_by_topic: dict[str, str] = {}
+        self._image_cache_lock = threading.Lock()
+        self._image_latest_by_topic: dict[str, Image] = {}
+        self._image_last_sent_monotonic_by_topic: dict[str, float] = {}
+        self._image_subscriptions_lock = threading.Lock()
+        self._image_subscriptions: dict[str, object] = {}
+        self._pointcloud_cache_lock = threading.Lock()
+        self._pointcloud_latest_by_topic: dict[str, PointCloud2] = {}
+        self._pointcloud_last_sent_monotonic_by_topic: dict[str, float] = {}
+        self._pointcloud_subscriptions_lock = threading.Lock()
+        self._pointcloud_subscriptions: dict[str, object] = {}
+        self._marker_array_subscriptions_lock = threading.Lock()
+        self._marker_array_subscriptions: dict[str, object] = {}
+        self._html_panel_subscriptions_lock = threading.Lock()
+        self._html_panel_subscriptions: dict[str, object] = {}
+        self._trigger_clients_lock = threading.Lock()
+        self._trigger_clients: dict[str, Client] = {}
 
         # ── Parameters ──────────────────────────────────────────────────
-        self.declare_parameter('image_topics', ['/camera/image_raw'])
-        self.declare_parameter('pointcloud_topics', ['/points'])
         self.declare_parameter('pointcloud_max_points', 8000)
         self.declare_parameter('image_jpeg_quality', 65)
-        self.declare_parameter('html_panel_topic', '/viewer_panel_html')
+        self.declare_parameter('joint_states_broadcast_hz', 1.0)
+        self.declare_parameter('tf_broadcast_hz', 1.0)
+        self.declare_parameter('image_broadcast_hz', 1.0)
+        self.declare_parameter('pointcloud_broadcast_hz', 1.0)
+        self.declare_parameter('image_topic_broadcast_hz', '{}')
+        self.declare_parameter('pointcloud_topic_broadcast_hz', '{}')
+        self.declare_parameter('html_routes', '{}')
         self.declare_parameter('fixed_frame', 'base_link')
         self.declare_parameter('target_frame', 'base_link')
-        self.declare_parameter('urdf_link_whitelist', [])
-        self.declare_parameter('urdf_link_blacklist', [])
-        self.declare_parameter('marker_array_topics', ['/markers'])
-        self._urdf_link_whitelist = self._resolve_string_list_parameter('urdf_link_whitelist')
-        self._urdf_link_blacklist = self._resolve_string_list_parameter('urdf_link_blacklist')
         self._fixed_frame = self._resolve_fixed_frame()
+        self._joint_states_broadcast_hz = self._resolve_positive_float_parameter('joint_states_broadcast_hz', 1.0)
+        self._tf_broadcast_hz = self._resolve_positive_float_parameter('tf_broadcast_hz', 1.0)
+        self._image_broadcast_hz = self._resolve_positive_float_parameter('image_broadcast_hz', 1.0)
+        self._pointcloud_broadcast_hz = self._resolve_positive_float_parameter('pointcloud_broadcast_hz', 1.0)
+        self._image_topic_broadcast_hz = self._resolve_topic_rate_map_parameter('image_topic_broadcast_hz')
+        self._pointcloud_topic_broadcast_hz = self._resolve_topic_rate_map_parameter('pointcloud_topic_broadcast_hz')
         self._server.set_client_init_messages_getter(self._get_ws_init_messages)
+        self._server.set_trigger_service_caller(self._call_trigger_service)
+        self._server.set_viewer_topic_registrar(self.register_viewer_topics)
+        self._server.set_html_panel_topic_registrar(self.register_html_panel_topic)
+        self._server.set_html_routes(self._resolve_html_routes_parameter('html_routes'))
+
+        self._joint_states_flush_timer = None
+        self._tf_flush_timer = None
+        if self._joint_states_broadcast_hz > 0.0:
+            self._joint_states_flush_timer = self.create_timer(
+                1.0 / self._joint_states_broadcast_hz,
+                self._flush_joint_states,
+            )
+        if self._tf_broadcast_hz > 0.0:
+            self._tf_flush_timer = self.create_timer(
+                1.0 / self._tf_broadcast_hz,
+                self._flush_dynamic_tf,
+            )
+        self._image_flush_timer = self.create_timer(
+            _SENSOR_THROTTLE_CHECK_PERIOD_SEC,
+            self._flush_images,
+        )
+        self._pointcloud_flush_timer = self.create_timer(
+            _SENSOR_THROTTLE_CHECK_PERIOD_SEC,
+            self._flush_pointclouds,
+        )
 
         # ── Core subscriptions ───────────────────────────────────────────
         self.create_subscription(
@@ -141,136 +205,167 @@ class WebViewerNode(Node):
         self.create_subscription(
             TFMessage, '/tf_static', lambda m: self._on_tf(m, True), _LATCHING_QOS)
 
-        # ── Dynamic topic subscriptions ──────────────────────────────────
-        for topic in self.get_parameter('image_topics').value:
-            self.create_subscription(
-                Image, topic,
-                lambda msg, t=topic: self._on_image(msg, t), 5)
-            self.get_logger().info(f'Subscribed to image topic: {topic}')
-
-        for topic in self.get_parameter('pointcloud_topics').value:
-            self.create_subscription(
-                PointCloud2, topic,
-                lambda msg, t=topic: self._on_pointcloud(msg, t), 2)
-            self.get_logger().info(f'Subscribed to point cloud topic: {topic}')
-
-        for topic in self.get_parameter('marker_array_topics').value:
-            self.create_subscription(
-                MarkerArray, topic,
-                lambda msg, t=topic: self._on_marker_array(msg, t), 5)
-            self.get_logger().info(f'Subscribed to marker_array topic: {topic}')
-
-        html_panel_topic = str(self.get_parameter('html_panel_topic').value or '').strip()
-        if html_panel_topic:
-            self.create_subscription(
-                String, html_panel_topic,
-                lambda msg, t=html_panel_topic: self._on_html_panel(msg, t), 5)
-            self.get_logger().info(f'Subscribed to html panel topic: {html_panel_topic}')
+        # ── Dynamic topic subscriptions are registered at runtime from canvas attributes ──
 
         self.get_logger().info('ros2_web_viewer node initialised')
         self.get_logger().info(f'Using fixed frame: {self._fixed_frame}')
-        if self._urdf_link_whitelist:
-            if self._urdf_link_blacklist:
-                self.get_logger().info(
-                    'Both urdf_link_whitelist and urdf_link_blacklist were provided; '
-                    'using whitelist and ignoring blacklist')
+        self.get_logger().info(
+            f'Throttle rates (Hz): joint_states={self._joint_states_broadcast_hz}, '
+            f'tf={self._tf_broadcast_hz}, image={self._image_broadcast_hz}, '
+            f'pointcloud={self._pointcloud_broadcast_hz}')
+        if self._image_topic_broadcast_hz:
             self.get_logger().info(
-                f'Using URDF link whitelist ({len(self._urdf_link_whitelist)}): {self._urdf_link_whitelist}')
-        elif self._urdf_link_blacklist:
+                f'Image topic-specific throttle overrides (Hz): {self._image_topic_broadcast_hz}')
+        if self._pointcloud_topic_broadcast_hz:
             self.get_logger().info(
-                f'Using URDF link blacklist ({len(self._urdf_link_blacklist)}): {self._urdf_link_blacklist}')
+                f'Point cloud topic-specific throttle overrides (Hz): {self._pointcloud_topic_broadcast_hz}')
 
-    def _resolve_string_list_parameter(self, name: str) -> list[str]:
-        """Return a normalised list[str] from a ROS parameter value.
-        
-        Returns empty list if parameter is not yet initialized (e.g., when loading from file).
-        """
+
+
+    def _resolve_positive_float_parameter(self, name: str, default: float) -> float:
+        """Return parameter as float. Non-positive values disable throttling."""
         try:
             raw = self.get_parameter(name).value
         except rclpy.exceptions.ParameterUninitializedException:
-            # Parameter not yet initialized from parameter file; use empty list default
-            return []
-
-        items: list[str] = []
-        if isinstance(raw, (list, tuple, set)):
-            items = [str(v).strip() for v in raw]
-        elif isinstance(raw, str):
-            raw_str = raw.strip()
-            if raw_str.startswith('[') and raw_str.endswith(']'):
-                try:
-                    parsed = ast.literal_eval(raw_str)
-                    if isinstance(parsed, (list, tuple, set)):
-                        items = [str(v).strip() for v in parsed]
-                    else:
-                        items = [str(parsed).strip()]
-                except (ValueError, SyntaxError):
-                    # Fall back to comma-separated parsing.
-                    items = [part.strip() for part in raw_str.split(',')]
-            else:
-                # Support comma-separated strings for convenience.
-                items = [part.strip() for part in raw_str.split(',')]
-        else:
-            items = [str(raw).strip()] if raw is not None else []
-
-        # Preserve order while removing blanks and duplicates.
-        deduped: list[str] = []
-        seen: set[str] = set()
-        for item in items:
-            if not item or item in seen:
-                continue
-            seen.add(item)
-            deduped.append(item)
-        return deduped
-
-    def _filter_urdf_links(self, urdf_xml: str) -> tuple[str, int, int, int]:
-        """Filter URDF links using whitelist/blacklist semantics.
-
-        Precedence: whitelist > blacklist > no filtering.
-        Returns (filtered_xml, original_link_count, kept_link_count, removed_joint_count).
-        """
-        whitelist = set(self._urdf_link_whitelist)
-        blacklist = set(self._urdf_link_blacklist)
-
-        if not whitelist and not blacklist:
-            return urdf_xml, 0, 0, 0
+            return float(default)
 
         try:
-            root = ET.fromstring(urdf_xml)
-        except ET.ParseError as exc:
+            value = float(raw)
+        except (TypeError, ValueError):
             self.get_logger().warning(
-                f'Failed to parse URDF for link filtering; serving unfiltered URDF: {exc}')
-            return urdf_xml, 0, 0, 0
+                f'Invalid value for parameter "{name}": {raw!r}. Using default {default}.')
+            return float(default)
+        return value
 
-        link_elements = [el for el in root.findall('link') if el.get('name')]
-        if not link_elements:
-            return urdf_xml, 0, 0, 0
+    def _resolve_topic_rate_map_parameter(self, name: str) -> dict[str, float]:
+        """Resolve mapping topic->Hz from dict/JSON/python-literal parameter."""
+        try:
+            raw = self.get_parameter(name).value
+        except rclpy.exceptions.ParameterUninitializedException:
+            return {}
 
-        link_names = [str(el.get('name')) for el in link_elements]
-        link_name_set = set(link_names)
+        parsed: dict | None = None
+        if isinstance(raw, dict):
+            parsed = raw
+        elif isinstance(raw, str):
+            raw_str = raw.strip()
+            if not raw_str:
+                return {}
+            try:
+                candidate = json.loads(raw_str)
+                if isinstance(candidate, dict):
+                    parsed = candidate
+            except json.JSONDecodeError:
+                try:
+                    candidate = ast.literal_eval(raw_str)
+                    if isinstance(candidate, dict):
+                        parsed = candidate
+                except (ValueError, SyntaxError):
+                    parsed = None
 
-        if whitelist:
-            selected_links = link_name_set.intersection(whitelist)
-        else:
-            selected_links = link_name_set.difference(blacklist)
+        if parsed is None:
+            self.get_logger().warning(
+                f'Invalid topic rate map in parameter "{name}": {raw!r}. Ignoring overrides.')
+            return {}
 
-        for link_el in list(root.findall('link')):
-            name = str(link_el.get('name') or '')
-            if name and name not in selected_links:
-                root.remove(link_el)
+        rates: dict[str, float] = {}
+        for topic, value in parsed.items():
+            topic_name = str(topic or '').strip()
+            if not topic_name or not self._is_valid_topic_name(topic_name):
+                continue
+            try:
+                rates[topic_name] = float(value)
+            except (TypeError, ValueError):
+                continue
+        return rates
 
-        removed_joints = 0
-        for joint_el in list(root.findall('joint')):
-            parent_el = joint_el.find('parent')
-            child_el = joint_el.find('child')
-            parent_link = str(parent_el.get('link') if parent_el is not None else '')
-            child_link = str(child_el.get('link') if child_el is not None else '')
+    @staticmethod
+    def _is_due(now: float, last_sent: float | None, hz: float) -> bool:
+        if hz <= 0.0:
+            return True
+        if last_sent is None:
+            return True
+        return (now - last_sent) >= (1.0 / hz)
 
-            if parent_link not in selected_links or child_link not in selected_links:
-                root.remove(joint_el)
-                removed_joints += 1
+    def _resolve_html_routes_parameter(self, name: str) -> dict[str, str]:
+        """Return route->path mapping from a dictionary-like parameter value."""
+        try:
+            raw = self.get_parameter(name).value
+        except rclpy.exceptions.ParameterUninitializedException:
+            self.get_logger().warning(
+                f'HTML routes parameter "{name}" is not yet initialized; defaulting to / -> index.html')
+            return {'/': 'index.html'}
 
-        filtered_xml = ET.tostring(root, encoding='unicode')
-        return filtered_xml, len(link_names), len(selected_links), removed_joints
+        parsed: dict | None = None
+        if isinstance(raw, dict):
+            parsed = raw
+            self.get_logger().info(f'Using HTML routes from parameter "{name}" (dict with {len(parsed)} entries)')
+        elif isinstance(raw, str):
+            raw_str = raw.strip()
+            self.get_logger().info(f'Parsing HTML routes from parameter "{name}" (string with length {len(raw_str)})')
+            if raw_str:
+                try:
+                    candidate = json.loads(raw_str)
+                    if isinstance(candidate, dict):
+                        parsed = candidate
+                        self.get_logger().info(f'Using HTML routes from parameter "{name}" (JSON string with {len(parsed)} entries)')
+                    else:
+                        self.get_logger().warning(
+                            f'Invalid html_routes value "{raw_str}" (expected JSON dict string)')
+                except json.JSONDecodeError:
+                    self.get_logger().warning(
+                        f'Failed to parse html_routes parameter "{name}" as JSON; trying Python literal_eval fallback')
+                    try:
+                        candidate = ast.literal_eval(raw_str)
+                        if isinstance(candidate, dict):
+                            parsed = candidate
+                    except (ValueError, SyntaxError):
+                        self.get_logger().warning(
+                            f'Invalid html_routes value "{raw_str}" (expected JSON/python dict string)')
+        elif raw:
+            self.get_logger().warning(
+                f'Ignoring html_routes of unsupported type: {type(raw).__name__}')
+
+        if not parsed:
+            self.get_logger().info('No html_routes configured; defaulting to / -> index.html')
+            return {'/': 'index.html'}
+
+        routes: dict[str, str] = {}
+        for route, path in parsed.items():
+            route_str = str(route or '').strip()
+            path_str = str(path or '').strip()
+            if not route_str or not path_str:
+                continue
+            if not route_str.startswith('/'):
+                route_str = f'/{route_str}'
+            resolved_path = self._expand_ros_package_substitutions(path_str)
+            if not resolved_path:
+                self.get_logger().warning(
+                    f'Skipping html route "{route_str}": could not resolve path "{path_str}"')
+                continue
+            routes[route_str] = resolved_path
+        if not routes:
+            self.get_logger().info('Resolved html_routes is empty; defaulting to / -> index.html')
+            return {'/': 'index.html'}
+        return routes
+
+    def _expand_ros_package_substitutions(self, path_str: str) -> str:
+        """Resolve ROS package substitutions like @package_name@."""
+
+        def _replace(match: re.Match[str]) -> str:
+            pkg_name = str(match.group(1) or '').strip()
+            if not pkg_name:
+                raise ValueError('empty package substitution')
+            if not _HAS_AMENT:
+                raise RuntimeError('ament index is not available in this environment')
+            return get_package_share_directory(pkg_name)
+
+        try:
+            return _ROS_PACKAGE_SUBSTITUTION_RE.sub(_replace, path_str)
+        except Exception as exc:
+            self.get_logger().warning(
+                f'Failed to resolve package substitution in html route path "{path_str}": {exc}')
+            return ''
 
     def _resolve_fixed_frame(self) -> str:
         """Pick fixed frame with precedence fixed_frame > target_frame > base_link.
@@ -291,6 +386,169 @@ class WebViewerNode(Node):
         selected = fixed_frame or target_frame or 'base_link'
         return selected.lstrip('/')
 
+    def _call_trigger_service(self, service_name: str, timeout_sec: float) -> dict:
+        service = str(service_name or '').strip()
+        timeout = max(_TRIGGER_TIMEOUT_MIN, min(float(timeout_sec or 2.0), _TRIGGER_TIMEOUT_MAX))
+        if not service:
+            return {'ok': False, 'error': 'Missing service name'}
+        if not re.fullmatch(r'/([A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*)', service):
+            return {'ok': False, 'error': f'Invalid service name "{service}"'}
+
+        with self._trigger_clients_lock:
+            client = self._trigger_clients.get(service)
+            if client is None:
+                client = self.create_client(Trigger, service)
+                self._trigger_clients[service] = client
+
+        if not client.wait_for_service(timeout_sec=timeout):
+            return {'ok': False, 'error': f'Service "{service}" is unavailable'}
+
+        done = threading.Event()
+        result: dict = {'ok': False}
+
+        future = client.call_async(Trigger.Request())
+
+        def _on_done(fut):
+            try:
+                response = fut.result()
+                success = bool(response.success)
+                result['ok'] = success
+                result['success'] = success
+                result['message'] = str(response.message)
+            except Exception as exc:
+                result['error'] = f'Call failed: {exc}'
+            finally:
+                done.set()
+
+        future.add_done_callback(_on_done)
+        if not done.wait(timeout):
+            return {'ok': False, 'error': f'Service "{service}" timed out'}
+        return result
+
+    def register_html_panel_topic(self, topic_name: str) -> dict:
+        topic = str(topic_name or '').strip()
+        if not topic:
+            return {'ok': False, 'error': 'Missing topic name'}
+        if not re.fullmatch(r'/([-A-Za-z0-9_]+(/[-A-Za-z0-9_]+)*)', topic):
+            return {'ok': False, 'error': 'Invalid topic name'}
+
+        with self._html_panel_subscriptions_lock:
+            if topic in self._html_panel_subscriptions:
+                return {'ok': True, 'topic': topic, 'registered': False}
+            sub = self.create_subscription(
+                String,
+                topic,
+                lambda msg, t=topic: self._on_html_panel(msg, t),
+                5,
+            )
+            self._html_panel_subscriptions[topic] = sub
+
+        self.get_logger().info(f'Subscribed to html panel topic: {topic}')
+        return {'ok': True, 'topic': topic, 'registered': True}
+
+    def _is_valid_topic_name(self, topic: str) -> bool:
+        return bool(re.fullmatch(r'/([-A-Za-z0-9_]+(/[-A-Za-z0-9_]+)*)', topic))
+
+    def _normalize_topic_list(self, value) -> list[str]:
+        topics: list[str] = []
+        if isinstance(value, (list, tuple, set)):
+            items = [str(v).strip() for v in value]
+        elif isinstance(value, str):
+            items = [part.strip() for part in re.split(r'[\s,]+', value)]
+        else:
+            items = [str(value).strip()] if value is not None else []
+
+        seen: set[str] = set()
+        for item in items:
+            if not item or item in seen:
+                continue
+            seen.add(item)
+            topics.append(item)
+        return topics
+
+    def _ensure_image_subscription(self, topic: str) -> bool:
+        with self._image_subscriptions_lock:
+            if topic in self._image_subscriptions:
+                return False
+            sub = self.create_subscription(
+                Image, topic,
+                lambda msg, t=topic: self._on_image(msg, t), 5,
+            )
+            self._image_subscriptions[topic] = sub
+        self.get_logger().info(f'Subscribed to image topic: {topic}')
+        return True
+
+    def _ensure_pointcloud_subscription(self, topic: str) -> bool:
+        with self._pointcloud_subscriptions_lock:
+            if topic in self._pointcloud_subscriptions:
+                return False
+            sub = self.create_subscription(
+                PointCloud2, topic,
+                lambda msg, t=topic: self._on_pointcloud(msg, t), 2,
+            )
+            self._pointcloud_subscriptions[topic] = sub
+        self.get_logger().info(f'Subscribed to point cloud topic: {topic}')
+        return True
+
+    def _ensure_marker_array_subscription(self, topic: str) -> bool:
+        with self._marker_array_subscriptions_lock:
+            if topic in self._marker_array_subscriptions:
+                return False
+            sub = self.create_subscription(
+                MarkerArray, topic,
+                lambda msg, t=topic: self._on_marker_array(msg, t), 5,
+            )
+            self._marker_array_subscriptions[topic] = sub
+        self.get_logger().info(f'Subscribed to marker_array topic: {topic}')
+        return True
+
+    def register_viewer_topics(self, payload: dict) -> dict:
+        if not isinstance(payload, dict):
+            return {'ok': False, 'error': 'Invalid payload'}
+
+        image_topics_list = self._normalize_topic_list(payload.get('image', []))
+        pointcloud_topics_list = self._normalize_topic_list(payload.get('pointcloud', []))
+        marker_topics_list = self._normalize_topic_list(payload.get('markers', []))
+
+        invalid_topics = [
+            topic for topic in (image_topics_list + pointcloud_topics_list + marker_topics_list)
+            if not self._is_valid_topic_name(topic)
+        ]
+        if invalid_topics:
+            return {
+                'ok': False,
+                'error': 'Invalid topic name',
+                'invalid_topics': invalid_topics,
+            }
+
+        registered = {
+            'image': [],
+            'pointcloud': [],
+            'markers': [],
+        }
+
+        for topic in image_topics_list:
+            if self._ensure_image_subscription(topic):
+                registered['image'].append(topic)
+
+        for topic in pointcloud_topics_list:
+            if self._ensure_pointcloud_subscription(topic):
+                registered['pointcloud'].append(topic)
+
+        for topic in marker_topics_list:
+            if self._ensure_marker_array_subscription(topic):
+                registered['markers'].append(topic)
+
+        return {
+            'ok': True,
+            'registered': registered,
+            'requested': {
+                'image': image_topics_list,
+                'pointcloud': pointcloud_topics_list,
+                'markers': marker_topics_list,
+            },
+        }
+
     # ── Accessors ────────────────────────────────────────────────────────
 
     @property
@@ -300,16 +558,8 @@ class WebViewerNode(Node):
     # ── Callbacks ────────────────────────────────────────────────────────
 
     def _on_urdf(self, msg: String):
-        filtered_urdf, total_links, kept_links, removed_joints = self._filter_urdf_links(msg.data)
-        self._urdf = filtered_urdf
-
-        if total_links > 0:
-            self.get_logger().info(
-                'robot_description received '
-                f'({len(msg.data)} bytes), URDF link filter kept {kept_links}/{total_links} links '
-                f'and removed {removed_joints} joints')
-        else:
-            self.get_logger().info(f'robot_description received ({len(msg.data)} bytes)')
+        self._urdf = msg.data
+        self.get_logger().info(f'robot_description received ({len(msg.data)} bytes)')
 
     def _on_joint_states(self, msg: JointState):
         payload = {
@@ -318,6 +568,17 @@ class WebViewerNode(Node):
             'position': [float(v) for v in msg.position],
             'velocity': [float(v) for v in (msg.velocity or [])],
         }
+        with self._joint_state_cache_lock:
+            self._joint_state_latest_payload = payload
+
+        if self._joint_states_broadcast_hz <= 0.0:
+            self._server.broadcast_threadsafe(json.dumps(payload))
+
+    def _flush_joint_states(self):
+        with self._joint_state_cache_lock:
+            payload = self._joint_state_latest_payload
+        if payload is None:
+            return
         self._server.broadcast_threadsafe(json.dumps(payload))
 
     def _on_tf(self, msg: TFMessage, static: bool):
@@ -338,13 +599,27 @@ class WebViewerNode(Node):
                     child = str(tf.get('child', '') or '').strip()
                     if child:
                         cache[child] = tf
-            payload = {
-                'type': 'tf',
-                'static': static,
-                'fixed_frame': self._fixed_frame,
-                'transforms': transforms,
-            }
-            self._server.broadcast_threadsafe(json.dumps(payload))
+            if static or self._tf_broadcast_hz <= 0.0:
+                payload = {
+                    'type': 'tf',
+                    'static': static,
+                    'fixed_frame': self._fixed_frame,
+                    'transforms': transforms,
+                }
+                self._server.broadcast_threadsafe(json.dumps(payload))
+
+    def _flush_dynamic_tf(self):
+        with self._tf_cache_lock:
+            dynamic_transforms = list(self._tf_dynamic_cache.values())
+        if not dynamic_transforms:
+            return
+        payload = {
+            'type': 'tf',
+            'static': False,
+            'fixed_frame': self._fixed_frame,
+            'transforms': dynamic_transforms,
+        }
+        self._server.broadcast_threadsafe(json.dumps(payload))
 
     def _get_ws_init_messages(self) -> list[str]:
         """Return cached state that new websocket clients need immediately."""
@@ -352,12 +627,16 @@ class WebViewerNode(Node):
         with self._tf_cache_lock:
             static_transforms = list(self._tf_static_cache.values())
             dynamic_transforms = list(self._tf_dynamic_cache.values())
+        with self._joint_state_cache_lock:
+            joint_states = dict(self._joint_state_latest_payload) if self._joint_state_latest_payload else None
         with self._marker_cache_lock:
             marker_snapshots = {
                 topic: list(marker_map.values())
                 for topic, marker_map in self._marker_cache_by_topic.items()
                 if marker_map
             }
+        with self._html_panel_cache_lock:
+            html_panel_snapshots = dict(self._html_panel_cache_by_topic)
 
         if static_transforms:
             messages.append(json.dumps({
@@ -375,6 +654,9 @@ class WebViewerNode(Node):
                 'transforms': dynamic_transforms,
             }))
 
+        if joint_states:
+            messages.append(json.dumps(joint_states))
+
         for topic, markers in marker_snapshots.items():
             messages.append(json.dumps({
                 'type': 'marker_array',
@@ -382,12 +664,43 @@ class WebViewerNode(Node):
                 'markers': markers,
             }))
 
+        for topic, html_data in html_panel_snapshots.items():
+            messages.append(json.dumps({
+                'type': 'html_panel',
+                'topic': topic,
+                'data': html_data,
+            }))
+
         return messages
 
     def _on_image(self, msg: Image, topic: str):
+        effective_hz = self._image_topic_broadcast_hz.get(topic, self._image_broadcast_hz)
+        if effective_hz <= 0.0:
+            self._broadcast_image_message(msg, topic)
+            return
+
+        with self._image_cache_lock:
+            self._image_latest_by_topic[topic] = msg
+
+    def _flush_images(self):
+        now_monotonic = time.monotonic()
+        due_messages: list[tuple[str, Image]] = []
+        with self._image_cache_lock:
+            for topic, msg in list(self._image_latest_by_topic.items()):
+                hz = self._image_topic_broadcast_hz.get(topic, self._image_broadcast_hz)
+                last_sent = self._image_last_sent_monotonic_by_topic.get(topic)
+                if not self._is_due(now_monotonic, last_sent, hz):
+                    continue
+                due_messages.append((topic, msg))
+                self._image_last_sent_monotonic_by_topic[topic] = now_monotonic
+                self._image_latest_by_topic.pop(topic, None)
+
+        for topic, msg in due_messages:
+            self._broadcast_image_message(msg, topic)
+
+    def _broadcast_image_message(self, msg: Image, topic: str):
         try:
             import cv2
-            import numpy as np
             from cv_bridge import CvBridge
             quality = self.get_parameter('image_jpeg_quality').value
             bridge = CvBridge()
@@ -409,6 +722,31 @@ class WebViewerNode(Node):
                                       throttle_duration_sec=5.0)
 
     def _on_pointcloud(self, msg: PointCloud2, topic: str):
+        effective_hz = self._pointcloud_topic_broadcast_hz.get(topic, self._pointcloud_broadcast_hz)
+        if effective_hz <= 0.0:
+            self._broadcast_pointcloud_message(msg, topic)
+            return
+
+        with self._pointcloud_cache_lock:
+            self._pointcloud_latest_by_topic[topic] = msg
+
+    def _flush_pointclouds(self):
+        now_monotonic = time.monotonic()
+        due_messages: list[tuple[str, PointCloud2]] = []
+        with self._pointcloud_cache_lock:
+            for topic, msg in list(self._pointcloud_latest_by_topic.items()):
+                hz = self._pointcloud_topic_broadcast_hz.get(topic, self._pointcloud_broadcast_hz)
+                last_sent = self._pointcloud_last_sent_monotonic_by_topic.get(topic)
+                if not self._is_due(now_monotonic, last_sent, hz):
+                    continue
+                due_messages.append((topic, msg))
+                self._pointcloud_last_sent_monotonic_by_topic[topic] = now_monotonic
+                self._pointcloud_latest_by_topic.pop(topic, None)
+
+        for topic, msg in due_messages:
+            self._broadcast_pointcloud_message(msg, topic)
+
+    def _broadcast_pointcloud_message(self, msg: PointCloud2, topic: str):
         try:
             max_pts = self.get_parameter('pointcloud_max_points').value
             packed = decode_pointcloud2(msg, max_pts)
@@ -486,6 +824,8 @@ class WebViewerNode(Node):
         self._server.broadcast_threadsafe(json.dumps(payload))
 
     def _on_html_panel(self, msg: String, topic: str):
+        with self._html_panel_cache_lock:
+            self._html_panel_cache_by_topic[topic] = msg.data
         payload = {
             'type': 'html_panel',
             'topic': topic,

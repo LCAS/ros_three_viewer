@@ -3,10 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PhenAIx · Chelsea Flower Show Digital Twin</title>
-  <link rel="stylesheet" href="/assets/style.css" />
-
-  <!-- Three.js ES module imports via importmap -->
+  <title>ROS2 Web Viewer · Modular Demo</title>
+  <link rel="stylesheet" href="style.css" />
   <script type="importmap">
   {
     "imports": {
@@ -17,18 +15,14 @@
   </script>
 </head>
 <body>
-
   <div id="app-layout">
     <div id="left-pane">
       <div id="viewer-square">
-        <!-- ── Three.js canvas ─────────────────────────────── -->
         <canvas
-          id="canvas"
           class="ros-viewer-canvas"
           data-ros-widget="3d"
-          data-display="urdf pointcloud markers"
-          data-pointcloud-topics="/points /integrated_cloud"
-          data-marker-topics="/markers"
+          data-display="urdf"
+          data-urdf-link-whitelist="shoulder_link upper_arm_link forearm_link wrist_1_link wrist_2_link wrist_3_link"
           data-camera-position="2.0 1.6 2.0"
           data-camera-look-at="0 0.5 0"
           data-controls-target="0 0.4 0"
@@ -42,40 +36,49 @@
     </div>
 
     <div id="right-pane">
+      <div style="position: relative; width: 100%; min-height: 240px; border: 1px solid rgba(224, 220, 169, 0.20); border-radius: 4px; overflow: hidden; background: rgba(0, 0, 0, 0.15);">
+        <canvas
+          class="ros-viewer-canvas"
+          data-ros-widget="3d"
+          data-display="pointcloud markers"
+          data-pointcloud-topics="/integrated_cloud /points"
+          data-marker-topics="/markers"
+          data-camera-position="2.0 1.6 2.0"
+          data-camera-look-at="0 0.5 0"
+          data-controls-target="0 0.4 0"
+          data-controls-enable-damping="true"
+          data-controls-damping-factor="0.06"
+          data-controls-min-distance="0.1"
+          data-controls-max-distance="20"
+          data-controls-auto-rotate="true"
+          data-controls-auto-rotate-speed="2"></canvas>
+      </div>
+
       <div id="html-panel" data-ros-widget="html-panel" data-topic="/viewer_panel_html">
         <div id="html-panel-header">
-          <span>&#x25CF;&nbsp;DYNAMIC PANEL</span>
-          <span id="html-topic-label" data-role="html-topic-label">—</span>
+          <span>&#x25CF;&nbsp;OPERATIONS PANEL</span>
+          <span data-role="html-topic-label">—</span>
         </div>
         <div id="html-panel-content" data-role="html-content">Waiting for ROS HTML content…</div>
       </div>
-
-      <!-- ── Camera image panel ───────────────────────────── -->
+            <!-- ── Camera image panel ───────────────────────────── -->
       <div id="image-panel" class="hidden" data-ros-widget="image-panel" data-topic="/camera/image_raw">
         <div id="image-header">
           <span>&#x25CF;&nbsp;SENSOR FEED</span>
           <span id="image-topic-label" data-role="image-topic-label">—</span>
         </div>
-        <img id="camera-image" alt="camera feed" style="display:none" />
+        <img id="camera-image" alt="camera feed"  />
         <div id="image-placeholder" data-role="image-placeholder">NO SIGNAL</div>
       </div>
+
     </div>
   </div>
 
-  <!-- ── Aesthetic overlays ──────────────────────────── -->
   <div id="bg-wallpaper"></div>
   <div id="vignette"></div>
-
-  <!-- Corner brackets -->
-  <div class="corner" id="corner-tl"></div>
-  <div class="corner" id="corner-tr"></div>
-  <div class="corner" id="corner-bl"></div>
-  <div class="corner" id="corner-br"></div>
-
-  <!-- ── Top bar ─────────────────────────────────────── -->
   <div id="topbar">
-    <div id="logo">Phen<span>AI</span>x</div>
-    <div id="tagline">Chelsea Flower Show · Digital Twin</div>
+    <div id="logo">ROS<span>2</span> Viewer</div>
+    <div id="tagline">Modular widgets demo</div>
     <div id="topbar-spacer"></div>
     <div id="ws-pill">
       <div id="ws-dot"></div>
@@ -83,14 +86,8 @@
     </div>
   </div>
 
-  <!-- ── Loading screen ──────────────────────────────── -->
-  <div id="loading">
-    <div id="loading-title">Phen<span>AI</span>x</div>
-    <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
-    <div id="loading-sub">Initialising digital twin…</div>
-  </div>
 
-  <!-- ── Application ─────────────────────────────────── -->
+  <div id="loading" style="display:none;"></div>
   <script type="module" src="/assets/app.js"></script>
 </body>
 </html>

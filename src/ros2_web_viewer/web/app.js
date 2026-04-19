@@ -31,6 +31,30 @@ const TRIGGER_TIMEOUT_DEFAULT = 2.0;
 const TRIGGER_TIMEOUT_MIN = 0.1;
 const TRIGGER_TIMEOUT_MAX = 30.0;
 
+const VIEW_LAYERS = {
+  BASE: 0,
+  URDF: 1,
+};
+
+const TOPIC_LAYER_START = 2;
+const TOPIC_LAYER_END = 31;
+const TOPIC_LAYER_FALLBACK = {
+  pointcloud: 2,
+  marker_array: 3,
+};
+
+const topicLayers = {
+  pointcloud: new Map(),
+  marker_array: new Map(),
+};
+let nextTopicLayer = TOPIC_LAYER_START;
+
+const DEFAULT_VIEWER_TOPICS = {
+  image: ['/camera/image_raw'],
+  pointcloud: ['/points'],
+  marker_array: ['/markers'],
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Widget discovery
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,6 +97,121 @@ function parseVector3Attr(el, attrName, fallback) {
     .filter(v => Number.isFinite(v));
   if (parsed.length !== 3) return [...fallback];
   return parsed;
+}
+
+function parseTopicListFromAttrs(el, attrNames, fallback = []) {
+  for (const attrName of attrNames) {
+    const raw = String(el.getAttribute(attrName) || '').trim();
+    if (!raw) continue;
+    const topics = raw
+      .split(/[\s,]+/)
+      .map((value) => value.trim())
+      .filter((value) => value.startsWith('/'));
+    if (topics.length > 0) {
+      return [...new Set(topics)];
+    }
+  }
+  return [...fallback];
+}
+
+function parseDisplaySetAttr(el) {
+  const raw = String(el.getAttribute('data-display') || '').trim();
+  if (!raw) {
+    return new Set(['urdf', 'pointcloud', 'markers']);
+  }
+  const values = raw
+    .split(/[\s,]+/)
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (values.includes('all')) {
+    return new Set(['urdf', 'pointcloud', 'markers']);
+  }
+  if (values.includes('none')) {
+    return new Set();
+  }
+
+  const aliasToKey = {
+    robot: 'urdf',
+    urdf: 'urdf',
+    cloud: 'pointcloud',
+    pc: 'pointcloud',
+    pointcloud: 'pointcloud',
+    point_cloud: 'pointcloud',
+    marker: 'markers',
+    markers: 'markers',
+  };
+
+  const selected = new Set();
+  for (const token of values) {
+    const key = aliasToKey[token];
+    if (key) selected.add(key);
+  }
+  return selected;
+}
+
+function parse3DDisplayConfig(el) {
+  const selected = parseDisplaySetAttr(el);
+  return {
+    showUrdf: parseBoolAttr(el, 'data-show-urdf', selected.has('urdf')),
+    showPointCloud: parseBoolAttr(el, 'data-show-pointcloud', selected.has('pointcloud')),
+    showMarkers: parseBoolAttr(el, 'data-show-markers', selected.has('markers')),
+  };
+}
+
+function parse3DTopicConfig(el, displayConfig) {
+  return {
+    pointCloudTopics: displayConfig.showPointCloud
+      ? parseTopicListFromAttrs(
+        el,
+        ['data-pointcloud-topics', 'data-topic-pointcloud', 'data-topic-cloud'],
+        DEFAULT_VIEWER_TOPICS.pointcloud,
+      )
+      : [],
+    markerArrayTopics: displayConfig.showMarkers
+      ? parseTopicListFromAttrs(
+        el,
+        ['data-marker-array-topics', 'data-marker-topics', 'data-topic-markers', 'data-topic-marker'],
+        DEFAULT_VIEWER_TOPICS.marker_array,
+      )
+      : [],
+    imageTopics: parseTopicListFromAttrs(
+      el,
+      ['data-image-topics', 'data-topic-image'],
+      [],
+    ),
+  };
+}
+
+function getTopicLayer(kind, topicName) {
+  const topic = String(topicName || '').trim();
+  if (!topic) return TOPIC_LAYER_FALLBACK[kind];
+  const existing = topicLayers[kind].get(topic);
+  if (existing != null) return existing;
+
+  if (nextTopicLayer > TOPIC_LAYER_END) {
+    const fallback = TOPIC_LAYER_FALLBACK[kind];
+    console.warn(
+      `[Viewer] Layer limit reached; falling back to shared ${kind} layer ${fallback} for topic "${topic}"`,
+    );
+    topicLayers[kind].set(topic, fallback);
+    return fallback;
+  }
+
+  const layer = nextTopicLayer;
+  nextTopicLayer += 1;
+  topicLayers[kind].set(topic, layer);
+  return layer;
+}
+
+function setObjectLayerRecursive(object3d, layer) {
+  object3d.traverse((node) => {
+    node.layers.set(layer);
+  });
+}
+
+function enableLightOnAllLayers(light) {
+  light.layers.enableAll();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -118,6 +257,22 @@ const viewerWidgets = threeCanvases.map((canvasEl) => {
   camera.position.set(cameraX, cameraY, cameraZ);
   camera.lookAt(lookAtX, lookAtY, lookAtZ);
 
+  const displayConfig = parse3DDisplayConfig(canvasEl);
+  const topicConfig = parse3DTopicConfig(canvasEl, displayConfig);
+  camera.layers.disableAll();
+  camera.layers.enable(VIEW_LAYERS.BASE);
+  if (displayConfig.showUrdf) camera.layers.enable(VIEW_LAYERS.URDF);
+  if (displayConfig.showPointCloud) {
+    for (const topic of topicConfig.pointCloudTopics) {
+      camera.layers.enable(getTopicLayer('pointcloud', topic));
+    }
+  }
+  if (displayConfig.showMarkers) {
+    for (const topic of topicConfig.markerArrayTopics) {
+      camera.layers.enable(getTopicLayer('marker_array', topic));
+    }
+  }
+
   const controls = new OrbitControls(camera, renderer.domElement);
   const [targetX, targetY, targetZ] = parseVector3Attr(canvasEl, 'data-controls-target', [0, 0.4, 0]);
   controls.target.set(targetX, targetY, targetZ);
@@ -139,8 +294,27 @@ const viewerWidgets = threeCanvases.map((canvasEl) => {
   composer.addPass(bloomPass);
   composer.addPass(new OutputPass());
 
-  return { canvasEl, renderer, camera, controls, composer, bloomPass };
+  return {
+    canvasEl,
+    renderer,
+    camera,
+    controls,
+    composer,
+    bloomPass,
+    displayConfig,
+    topicConfig,
+  };
 });
+
+const activePointCloudTopics = new Set(
+  viewerWidgets.flatMap((widget) => widget.topicConfig.pointCloudTopics),
+);
+const activeMarkerArrayTopics = new Set(
+  viewerWidgets.flatMap((widget) => widget.topicConfig.markerArrayTopics),
+);
+const activeImageTopics = new Set(
+  viewerWidgets.flatMap((widget) => widget.topicConfig.imageTopics),
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lighting
@@ -155,16 +329,21 @@ keyLight.shadow.mapSize.set(1024, 1024);
 keyLight.shadow.camera.near = 0.1;
 keyLight.shadow.camera.far = 20;
 scene.add(keyLight);
+enableLightOnAllLayers(keyLight);
 
 const fillLight = new THREE.PointLight(0x8ab870, 1.8, 10);
 fillLight.position.set(-2.5, 1.5, -1);
 scene.add(fillLight);
+enableLightOnAllLayers(fillLight);
 
 const rimLight = new THREE.PointLight(0xe0c060, 1.0, 8);
 rimLight.position.set(1, 3, -3);
 scene.add(rimLight);
+enableLightOnAllLayers(rimLight);
 
-scene.add(new THREE.HemisphereLight(0xd4c8a0, 0x2a1e10, 0.5));
+const hemiLight = new THREE.HemisphereLight(0xd4c8a0, 0x2a1e10, 0.5);
+scene.add(hemiLight);
+enableLightOnAllLayers(hemiLight);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Scene decorations
@@ -206,55 +385,67 @@ scene.add(groundMesh);
 // Point Cloud — custom GLSL shader
 // ─────────────────────────────────────────────────────────────────────────────
 
-const cloudPositions = new Float32Array(MAX_CLOUD_PTS * 3);
-const cloudColors    = new Float32Array(MAX_CLOUD_PTS * 3);
+const pointCloudByTopic = new Map();
 
-const cloudGeo = new THREE.BufferGeometry();
-cloudGeo.setAttribute('position', new THREE.BufferAttribute(cloudPositions, 3));
-cloudGeo.setAttribute('aColor',   new THREE.BufferAttribute(cloudColors, 3));
-cloudGeo.setDrawRange(0, 0);
+function createPointCloudMaterial() {
+  return new THREE.ShaderMaterial({
+    vertexShader: /* glsl */`
+      attribute vec3 aColor;
+      varying   vec3 vColor;
+      uniform   float uSize;
 
-const cloudMat = new THREE.ShaderMaterial({
-  vertexShader: /* glsl */`
-    attribute vec3 aColor;
-    varying   vec3 vColor;
-    uniform   float uSize;
+      void main() {
+        vColor = aColor;
+        vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = uSize * (40.0 / -mvPos.z);
+        gl_Position  = projectionMatrix * mvPos;
+      }
+    `,
+    fragmentShader: /* glsl */`
+      varying vec3 vColor;
 
-    void main() {
-      vColor = aColor;
-      vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-      gl_PointSize = uSize * (40.0 / -mvPos.z);
-      gl_Position  = projectionMatrix * mvPos;
-    }
-  `,
-  fragmentShader: /* glsl */`
-    varying vec3 vColor;
+      void main() {
+        vec2  uv = 2.0 * gl_PointCoord - 1.0;
+        float r  = dot(uv, uv);
+        if (r > 1.0) discard;
 
-    void main() {
-      vec2  uv = 2.0 * gl_PointCoord - 1.0;
-      float r  = dot(uv, uv);
-      if (r > 1.0) discard;
+        // Tight glowing disc
+        float core  = smoothstep(1.0, 0.0, r);
+        float glow  = pow(core, 6.0);
+        float alpha = glow * 0.95;
 
-      // Tight glowing disc
-      float core  = smoothstep(1.0, 0.0, r);
-      float glow  = pow(core, 6.0);
-      float alpha = glow * 0.95;
+        gl_FragColor = vec4(vColor * (0.7 + 0.3 * glow), alpha);
+      }
+    `,
+    uniforms: { uSize: { value: 2.0 } },
+    vertexColors: false,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+}
 
-      gl_FragColor = vec4(vColor * (0.7 + 0.3 * glow), alpha);
-    }
-  `,
-  uniforms: { uSize: { value: 2.0 } },
-  vertexColors: false,
-  transparent: true,
-  depthWrite: false,
-  blending: THREE.AdditiveBlending,
-});
+function getOrCreatePointCloudEntry(topicName) {
+  const topic = String(topicName || '').trim() || '<unknown>';
+  const existing = pointCloudByTopic.get(topic);
+  if (existing) return existing;
 
-const pointCloud = new THREE.Points(cloudGeo, cloudMat);
-pointCloud.frustumCulled = false;
-rosSceneRoot.add(pointCloud);
+  const positions = new Float32Array(MAX_CLOUD_PTS * 3);
+  const colors = new Float32Array(MAX_CLOUD_PTS * 3);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('aColor', new THREE.BufferAttribute(colors, 3));
+  geometry.setDrawRange(0, 0);
 
-let pointCloudFrameId = '';
+  const points = new THREE.Points(geometry, createPointCloudMaterial());
+  points.frustumCulled = false;
+  setObjectLayerRecursive(points, getTopicLayer('pointcloud', topic));
+  rosSceneRoot.add(points);
+
+  const entry = { topic, points, geometry, positions, colors, frameId: '' };
+  pointCloudByTopic.set(topic, entry);
+  return entry;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Viridis colourmap (JS-side, for any unmapped points)
@@ -270,7 +461,8 @@ function viridis(t) {
 }
 
 // Decode base64 → Float32Array, fill buffers
-function updatePointCloud(b64, count, frameId) {
+function updatePointCloud(topic, b64, count, frameId) {
+  const entry = getOrCreatePointCloudEntry(topic);
   const binary = atob(b64);
   const buf    = new ArrayBuffer(binary.length);
   const bytes  = new Uint8Array(buf);
@@ -288,41 +480,47 @@ function updatePointCloud(b64, count, frameId) {
 
   for (let i = 0; i < n; i++) {
     const fi = i * 6;
-    cloudPositions[i * 3]     = f[fi];
-    cloudPositions[i * 3 + 1] = f[fi + 1];
-    cloudPositions[i * 3 + 2] = f[fi + 2];
+    entry.positions[i * 3]     = f[fi];
+    entry.positions[i * 3 + 1] = f[fi + 1];
+    entry.positions[i * 3 + 2] = f[fi + 2];
 
     let r = f[fi + 3], g = f[fi + 4], b = f[fi + 5];
     if (!isFinite(r) || r < 0) {
       // Fallback height colourmap
       [r, g, b] = viridis((f[fi + 2] - zMin) / zRange);
     }
-    cloudColors[i * 3]     = r;
-    cloudColors[i * 3 + 1] = g;
-    cloudColors[i * 3 + 2] = b;
+    entry.colors[i * 3]     = r;
+    entry.colors[i * 3 + 1] = g;
+    entry.colors[i * 3 + 2] = b;
   }
 
-  cloudGeo.setDrawRange(0, n);
-  cloudGeo.attributes.position.needsUpdate = true;
-  cloudGeo.attributes.aColor.needsUpdate   = true;
+  entry.geometry.setDrawRange(0, n);
+  entry.geometry.attributes.position.needsUpdate = true;
+  entry.geometry.attributes.aColor.needsUpdate   = true;
 
-  pointCloudFrameId = normalizeFrameId(frameId);
-  updatePointCloudPoseFromTF();
+  entry.frameId = normalizeFrameId(frameId);
+  updatePointCloudPoseFromTF(entry);
 }
 
-function updatePointCloudPoseFromTF() {
-  const frameMat = getFrameMatrixInFixedFrame(pointCloudFrameId, 'pointcloud');
+function updatePointCloudPoseFromTF(entry) {
+  const frameMat = getFrameMatrixInFixedFrame(entry.frameId, `pointcloud:${entry.topic}`);
   if (frameMat) {
-    clearTfWarning(`pointcloud-fallback:${pointCloudFrameId || 'empty'}`);
-    frameMat.decompose(pointCloud.position, pointCloud.quaternion, pointCloud.scale);
+    clearTfWarning(`pointcloud-fallback:${entry.topic}:${entry.frameId || 'empty'}`);
+    frameMat.decompose(entry.points.position, entry.points.quaternion, entry.points.scale);
   } else {
     warnTfOnce(
-      `pointcloud-fallback:${pointCloudFrameId || 'empty'}`,
-      `[TF] Point cloud pose fallback to identity because transform lookup failed for frame "${pointCloudFrameId || '<empty>'}"`,
+      `pointcloud-fallback:${entry.topic}:${entry.frameId || 'empty'}`,
+      `[TF] Point cloud topic "${entry.topic}" pose fallback to identity because transform lookup failed for frame "${entry.frameId || '<empty>'}"`,
     );
-    pointCloud.position.set(0, 0, 0);
-    pointCloud.quaternion.identity();
-    pointCloud.scale.set(1, 1, 1);
+    entry.points.position.set(0, 0, 0);
+    entry.points.quaternion.identity();
+    entry.points.scale.set(1, 1, 1);
+  }
+}
+
+function updateAllPointCloudPosesFromTF() {
+  for (const entry of pointCloudByTopic.values()) {
+    updatePointCloudPoseFromTF(entry);
   }
 }
 
@@ -333,6 +531,7 @@ function updatePointCloudPoseFromTF() {
 const robotRoot = new THREE.Group();
 robotRoot.name = 'robot_root';
 rosSceneRoot.add(robotRoot);
+setObjectLayerRecursive(robotRoot, VIEW_LAYERS.URDF);
 
 // Maps populated when URDF is parsed
 const jointPivots       = {};   // joint name → Group (the pivot at joint origin)
@@ -426,6 +625,7 @@ function createLinkVisuals(linkEl, linkGroup) {
         phMat.transparent = true; phMat.opacity = 0.35;
         const ph = new THREE.Mesh(new THREE.OctahedronGeometry(0.025), phMat);
         applyOrigin(ph, origin);
+        setObjectLayerRecursive(ph, VIEW_LAYERS.URDF);
         linkGroup.add(ph);
 
         const scaleAttr = child.getAttribute('scale');
@@ -439,6 +639,7 @@ function createLinkVisuals(linkEl, linkGroup) {
           const realMesh = new THREE.Mesh(geo, robotMaterial(color));
           realMesh.castShadow = true;
           applyOrigin(realMesh, origin);
+          setObjectLayerRecursive(realMesh, VIEW_LAYERS.URDF);
           linkGroup.remove(ph);
           linkGroup.add(realMesh);
         }, undefined, () => { /* silently keep placeholder */ });
@@ -450,6 +651,7 @@ function createLinkVisuals(linkEl, linkGroup) {
         phMat.transparent = true; phMat.opacity = 0.35;
         const ph = new THREE.Mesh(new THREE.OctahedronGeometry(0.025), phMat);
         applyOrigin(ph, origin);
+        setObjectLayerRecursive(ph, VIEW_LAYERS.URDF);
         linkGroup.add(ph);
 
         const scaleAttr = child.getAttribute('scale');
@@ -472,6 +674,7 @@ function createLinkVisuals(linkEl, linkGroup) {
           });
           applyOrigin(daeRoot, origin);
           daeRoot.add(daeScene);
+          setObjectLayerRecursive(daeRoot, VIEW_LAYERS.URDF);
           linkGroup.remove(ph);
           linkGroup.add(daeRoot);
         }, undefined, () => { /* silently keep placeholder */ });
@@ -485,6 +688,7 @@ function createLinkVisuals(linkEl, linkGroup) {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       applyOrigin(mesh, origin);
+      setObjectLayerRecursive(mesh, VIEW_LAYERS.URDF);
       linkGroup.add(mesh);
     }
   }
@@ -566,6 +770,7 @@ async function loadURDF(xmlString) {
                    ?? Object.keys(linkGroups)[0];
   if (rootName && linkGroups[rootName]) {
     robotRoot.add(linkGroups[rootName]);
+    setObjectLayerRecursive(robotRoot, VIEW_LAYERS.URDF);
     robotBaseFrame = normalizeFrameId(rootName) || 'base_link';
     updateRobotPoseFromTF();
   }
@@ -650,7 +855,7 @@ function applyTF(transforms, _static, fixedFrameFromMsg) {
     };
   }
   updateRobotPoseFromTF();
-  updatePointCloudPoseFromTF();
+  updateAllPointCloudPosesFromTF();
   updateMarkerPosesFromTF();
 }
 
@@ -737,14 +942,27 @@ const MK = {
   ADD: 0, MODIFY: 0, DELETE: 2, DELETEALL: 3,
 };
 
-const markerRoot = new THREE.Group();
-markerRoot.name = 'markers';
-rosSceneRoot.add(markerRoot);
+const markerRootsByTopic = new Map();
 
-// "ns:id" → Object3D
+// "<topic>::ns:id" → Object3D
 const markerObjects = new Map();
-// "ns:id" → latest marker payload (for TF-driven pose refresh)
+// "<topic>::ns:id" → latest marker payload (for TF-driven pose refresh)
 const markerMessages = new Map();
+// "<topic>::ns:id" → topic
+const markerObjectTopics = new Map();
+
+function getOrCreateMarkerRoot(topicName) {
+  const topic = String(topicName || '').trim() || '<unknown>';
+  const existing = markerRootsByTopic.get(topic);
+  if (existing) return existing;
+
+  const root = new THREE.Group();
+  root.name = `markers_${topic}`;
+  setObjectLayerRecursive(root, getTopicLayer('marker_array', topic));
+  rosSceneRoot.add(root);
+  markerRootsByTopic.set(topic, root);
+  return root;
+}
 
 // Walk TF chain to compute world-space matrix of a named frame
 function getFrameWorldMatrix(frameId) {
@@ -1010,34 +1228,49 @@ function applyMarkerPose(obj, m) {
 function _removeMarker(key) {
   const obj = markerObjects.get(key);
   if (!obj) return;
-  markerRoot.remove(obj);
+  const topic = markerObjectTopics.get(key) || '';
+  const topicRoot = markerRootsByTopic.get(topic);
+  if (topicRoot) {
+    topicRoot.remove(obj);
+  }
   disposeMarker(obj);
   markerObjects.delete(key);
   markerMessages.delete(key);
+  markerObjectTopics.delete(key);
 }
 
-function _removeAllMarkers(ns) {
+function _removeAllMarkers(topic, ns) {
   for (const key of [...markerObjects.keys()]) {
-    if (ns === null || key.startsWith(ns + ':')) _removeMarker(key);
+    const topicPrefix = `${topic}::`;
+    if (!key.startsWith(topicPrefix)) continue;
+    if (ns === null || key.substring(topicPrefix.length).startsWith(ns + ':')) {
+      _removeMarker(key);
+    }
   }
 }
 
 function updateMarkerArray(msg) {
+  const topic = String(msg.topic || '').trim() || '<unknown>';
+  const topicRoot = getOrCreateMarkerRoot(topic);
+  const layer = getTopicLayer('marker_array', topic);
+
   for (const m of msg.markers) {
-    const key = `${m.ns}:${m.id}`;
+    const key = `${topic}::${m.ns}:${m.id}`;
 
     if (m.action === MK.DELETE)    { _removeMarker(key); continue; }
-    if (m.action === MK.DELETEALL) { _removeAllMarkers(m.ns || null); continue; }
+    if (m.action === MK.DELETEALL) { _removeAllMarkers(topic, m.ns || null); continue; }
 
     // ADD / MODIFY (both == 0): recreate geometry
     if (markerObjects.has(key)) _removeMarker(key);
 
     const obj = createMarkerObject(m);
     if (!obj) continue;
+    setObjectLayerRecursive(obj, layer);
     applyMarkerPose(obj, m);
-    markerRoot.add(obj);
+    topicRoot.add(obj);
     markerObjects.set(key, obj);
     markerMessages.set(key, m);
+    markerObjectTopics.set(key, topic);
   }
   const n = markerObjects.size;
   setStatus('markers', `${n} marker${n !== 1 ? 's' : ''}`, 'ok');
@@ -1089,15 +1322,24 @@ function connectWS() {
         break;
 
       case 'image':
+        if (activeImageTopics.size > 0 && !activeImageTopics.has(msg.topic)) {
+          break;
+        }
         updateImage(msg.data, msg.topic);
         break;
 
       case 'pointcloud':
-        updatePointCloud(msg.data, msg.count, msg.frame_id);
+        if (activePointCloudTopics.size > 0 && !activePointCloudTopics.has(msg.topic)) {
+          break;
+        }
+        updatePointCloud(msg.topic, msg.data, msg.count, msg.frame_id);
         setStatus('cloud', `${msg.count} pts · ${msg.frame_id}`, 'ok');
         break;
 
       case 'marker_array':
+        if (activeMarkerArrayTopics.size > 0 && !activeMarkerArrayTopics.has(msg.topic)) {
+          break;
+        }
         updateMarkerArray(msg);
         break;
 
@@ -1280,6 +1522,42 @@ async function registerHtmlPanelTopics() {
   }
 }
 
+async function registerViewerTopics() {
+  const payload = {
+    image_topics: [...activeImageTopics],
+    pointcloud_topics: [...activePointCloudTopics],
+    marker_array_topics: [...activeMarkerArrayTopics],
+  };
+
+  if (
+    payload.image_topics.length === 0
+    && payload.pointcloud_topics.length === 0
+    && payload.marker_array_topics.length === 0
+  ) {
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/register_viewer_topics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      let detail = '';
+      try {
+        const result = await response.json();
+        detail = result?.error ? `: ${result.error}` : '';
+      } catch {
+        // ignore parse errors for non-JSON responses
+      }
+      console.warn(`[Viewer] Failed to register dynamic topics${detail}`);
+    }
+  } catch (err) {
+    console.warn('[Viewer] Failed to register dynamic topics:', err);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // URDF fetching (polls until robot_description arrives)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1362,7 +1640,7 @@ function animate() {
   fillLight.intensity = 2.3 + 0.4 * Math.sin(now * 0.001);
 
   for (const widget of viewerWidgets) {
-    widget.controls.update();
+    widget.controls.update(dt * 0.001);
     widget.composer.render();
   }
 }
@@ -1398,6 +1676,7 @@ if (loadingEl) {
 // Start
 // ─────────────────────────────────────────────────────────────────────────────
 
+registerViewerTopics();
 connectWS();
 registerHtmlPanelTopics();
 fetchURDF();

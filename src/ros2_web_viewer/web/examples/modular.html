@@ -21,6 +21,7 @@
         <canvas
           class="ros-viewer-canvas"
           data-ros-widget="3d"
+          data-display="urdf"
           data-camera-position="2.0 1.6 2.0"
           data-camera-look-at="0 0.5 0"
           data-controls-target="0 0.4 0"
@@ -38,6 +39,9 @@
         <canvas
           class="ros-viewer-canvas"
           data-ros-widget="3d"
+          data-display="pointcloud markers"
+          data-pointcloud-topics="/integrated_cloud /points"
+          data-marker-topics="/markers"
           data-camera-position="2.0 1.6 2.0"
           data-camera-look-at="0 0.5 0"
           data-controls-target="0 0.4 0"
@@ -46,7 +50,7 @@
           data-controls-min-distance="0.1"
           data-controls-max-distance="20"
           data-controls-auto-rotate="true"
-          data-controls-auto-rotate-speed="0.75"></canvas>
+          data-controls-auto-rotate-speed="2"></canvas>
       </div>
 
       <div id="html-panel" data-ros-widget="html-panel" data-topic="/viewer_panel_html">

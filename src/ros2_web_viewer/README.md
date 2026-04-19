@@ -130,6 +130,12 @@ ros2 topic pub /viewer_panel_html std_msgs/String \
 - **Topics & rendering** — edit [config/params.yaml](config/params.yaml)
 - **PhenAIx defaults** — edit [config/phenaix_params.yaml](config/phenaix_params.yaml)
 - **Widget composition** — use `data-ros-widget="3d"` canvases and `data-ros-widget="html-panel"` containers in your HTML
+- **Per-canvas data selection** — control each 3D canvas with `data-display="urdf pointcloud markers"` (tokens: `urdf|robot`, `pointcloud|cloud|pc`, `markers|marker`, plus `all`/`none`)
+- **Display overrides** — use `data-show-urdf`, `data-show-pointcloud`, `data-show-markers` (boolean) to override `data-display`
+- **Dynamic backend topic subscriptions** — configure canvas topic attributes and the frontend registers them via `POST /api/register_viewer_topics`
+  - point cloud: `data-pointcloud-topics` (or `data-topic-pointcloud`)
+  - markers: `data-marker-array-topics` / `data-marker-topics`
+  - image: `data-image-topics`
 - **Extra pages** — configure `html_routes` in params to map custom routes to HTML files in `web/`
 - **Trigger buttons** — add `<button data-trigger-service="/my/service">` to panel HTML
 - **Colours / theme** — edit CSS variables in `web/style.css` (`:root` block)

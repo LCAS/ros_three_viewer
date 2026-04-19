@@ -4,6 +4,7 @@ Exposes:
   GET  /            → index.html (Three.js viewer)
   GET  /api/urdf    → raw URDF XML (204 if not yet received)
   POST /api/trigger → call a std_srvs/Trigger service
+    POST /api/register_viewer_topics → subscribe to viewer data topics requested by 3D canvas widgets
   POST /api/register_html_panel_topic → subscribe to a String topic for HTML panel widgets
   GET  /mesh/{pkg}/{path:path} → proxy mesh files from ROS packages
   GET  <configured html routes> → custom HTML files from web/
@@ -51,6 +52,7 @@ class ViewerServer:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._client_init_messages_getter: Callable[[], list[str]] | None = None
         self._trigger_service_caller: Callable[[str, float], dict] | None = None
+        self._viewer_topic_registrar: Callable[[dict], dict] | None = None
         self._html_panel_topic_registrar: Callable[[str], dict] | None = None
         self._html_routes: dict[str, str] = {}
         self.app = self._build_app()
@@ -146,6 +148,22 @@ class ViewerServer:
             status_code = 200 if result.get('ok', False) else 400
             return JSONResponse(status_code=status_code, content=result)
 
+        @app.post('/api/register_viewer_topics')
+        async def register_viewer_topics(payload: dict):
+            if self._viewer_topic_registrar is None:
+                return JSONResponse(
+                    status_code=503,
+                    content={'ok': False, 'error': 'Viewer topic registrar is not configured'},
+                )
+
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: self._viewer_topic_registrar(payload or {}),
+            )
+            status_code = 200 if result.get('ok', False) else 400
+            return JSONResponse(status_code=status_code, content=result)
+
         @app.get('/mesh/{package}/{path:path}')
         async def mesh(package: str, path: str):
             if not _HAS_AMENT:
@@ -220,7 +238,7 @@ class ViewerServer:
             path_str = str(rel_path or '').strip()
             if not route_str.startswith('/'):
                 route_str = f'/{route_str}'
-            if route_str in ('/', '/ws', '/api', '/api/urdf', '/api/trigger', '/api/register_html_panel_topic'):
+            if route_str in ('/', '/ws', '/api', '/api/urdf', '/api/trigger', '/api/register_html_panel_topic', '/api/register_viewer_topics'):
                 log.warning('Skipping html route "%s": reserved route', route_str)
                 continue
             if route_str.startswith('/api/'):
@@ -277,6 +295,10 @@ class ViewerServer:
     def set_trigger_service_caller(self, caller: Callable[[str, float], dict]):
         """Register callback used by HTTP route /api/trigger."""
         self._trigger_service_caller = caller
+
+    def set_viewer_topic_registrar(self, registrar: Callable[[dict], dict]):
+        """Register callback used by HTTP route /api/register_viewer_topics."""
+        self._viewer_topic_registrar = registrar
 
     def set_html_panel_topic_registrar(self, registrar: Callable[[str], dict]):
         """Register callback used by HTTP route /api/register_html_panel_topic."""

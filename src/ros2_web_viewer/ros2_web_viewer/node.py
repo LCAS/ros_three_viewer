@@ -8,6 +8,7 @@ Topics subscribed (all configurable via ROS2 parameters):
   /joint_states           sensor_msgs/JointState            → JSON message type 'joint_states'
   /tf                     tf2_msgs/TFMessage                → JSON message type 'tf'
   /tf_static              tf2_msgs/TFMessage                → JSON message type 'tf' (static=true)
+    <viewer topics requested by 3D widgets>                  → dynamic subscriptions via /api/register_viewer_topics
   <html_panel_topics>     std_msgs/String                   → JSON message type 'html_panel' (registered by web widgets)
   <image_topics>          sensor_msgs/Image                 → JSON message type 'image' (JPEG base64)
   <pointcloud_topics>     sensor_msgs/PointCloud2           → JSON message type 'pointcloud' (binary b64)
@@ -119,6 +120,12 @@ class WebViewerNode(Node):
         self._marker_cache_by_topic: dict[str, dict[str, dict]] = {}
         self._html_panel_cache_lock = threading.Lock()
         self._html_panel_cache_by_topic: dict[str, str] = {}
+        self._image_subscriptions_lock = threading.Lock()
+        self._image_subscriptions: dict[str, object] = {}
+        self._pointcloud_subscriptions_lock = threading.Lock()
+        self._pointcloud_subscriptions: dict[str, object] = {}
+        self._marker_array_subscriptions_lock = threading.Lock()
+        self._marker_array_subscriptions: dict[str, object] = {}
         self._html_panel_subscriptions_lock = threading.Lock()
         self._html_panel_subscriptions: dict[str, object] = {}
         self._trigger_clients_lock = threading.Lock()
@@ -140,6 +147,7 @@ class WebViewerNode(Node):
         self._fixed_frame = self._resolve_fixed_frame()
         self._server.set_client_init_messages_getter(self._get_ws_init_messages)
         self._server.set_trigger_service_caller(self._call_trigger_service)
+        self._server.set_viewer_topic_registrar(self.register_viewer_topics)
         self._server.set_html_panel_topic_registrar(self.register_html_panel_topic)
         self._server.set_html_routes(self._resolve_html_routes_parameter('html_routes'))
 
@@ -156,24 +164,15 @@ class WebViewerNode(Node):
         self.create_subscription(
             TFMessage, '/tf_static', lambda m: self._on_tf(m, True), _LATCHING_QOS)
 
-        # ── Dynamic topic subscriptions ──────────────────────────────────
-        for topic in self.get_parameter('image_topics').value:
-            self.create_subscription(
-                Image, topic,
-                lambda msg, t=topic: self._on_image(msg, t), 5)
-            self.get_logger().info(f'Subscribed to image topic: {topic}')
+        # ── Dynamic topic subscriptions (parameter defaults + runtime registration) ──
+        for topic in self._resolve_string_list_parameter('image_topics'):
+            self._ensure_image_subscription(topic)
 
-        for topic in self.get_parameter('pointcloud_topics').value:
-            self.create_subscription(
-                PointCloud2, topic,
-                lambda msg, t=topic: self._on_pointcloud(msg, t), 2)
-            self.get_logger().info(f'Subscribed to point cloud topic: {topic}')
+        for topic in self._resolve_string_list_parameter('pointcloud_topics'):
+            self._ensure_pointcloud_subscription(topic)
 
-        for topic in self.get_parameter('marker_array_topics').value:
-            self.create_subscription(
-                MarkerArray, topic,
-                lambda msg, t=topic: self._on_marker_array(msg, t), 5)
-            self.get_logger().info(f'Subscribed to marker_array topic: {topic}')
+        for topic in self._resolve_string_list_parameter('marker_array_topics'):
+            self._ensure_marker_array_subscription(topic)
 
         self.get_logger().info('ros2_web_viewer node initialised')
         self.get_logger().info(f'Using fixed frame: {self._fixed_frame}')
@@ -410,6 +409,109 @@ class WebViewerNode(Node):
 
         self.get_logger().info(f'Subscribed to html panel topic: {topic}')
         return {'ok': True, 'topic': topic, 'registered': True}
+
+    def _is_valid_topic_name(self, topic: str) -> bool:
+        return bool(re.fullmatch(r'/([-A-Za-z0-9_]+(/[-A-Za-z0-9_]+)*)', topic))
+
+    def _normalize_topic_list(self, value) -> list[str]:
+        topics: list[str] = []
+        if isinstance(value, (list, tuple, set)):
+            items = [str(v).strip() for v in value]
+        elif isinstance(value, str):
+            items = [part.strip() for part in re.split(r'[\s,]+', value)]
+        else:
+            items = [str(value).strip()] if value is not None else []
+
+        seen: set[str] = set()
+        for item in items:
+            if not item or item in seen:
+                continue
+            seen.add(item)
+            topics.append(item)
+        return topics
+
+    def _ensure_image_subscription(self, topic: str) -> bool:
+        with self._image_subscriptions_lock:
+            if topic in self._image_subscriptions:
+                return False
+            sub = self.create_subscription(
+                Image, topic,
+                lambda msg, t=topic: self._on_image(msg, t), 5,
+            )
+            self._image_subscriptions[topic] = sub
+        self.get_logger().info(f'Subscribed to image topic: {topic}')
+        return True
+
+    def _ensure_pointcloud_subscription(self, topic: str) -> bool:
+        with self._pointcloud_subscriptions_lock:
+            if topic in self._pointcloud_subscriptions:
+                return False
+            sub = self.create_subscription(
+                PointCloud2, topic,
+                lambda msg, t=topic: self._on_pointcloud(msg, t), 2,
+            )
+            self._pointcloud_subscriptions[topic] = sub
+        self.get_logger().info(f'Subscribed to point cloud topic: {topic}')
+        return True
+
+    def _ensure_marker_array_subscription(self, topic: str) -> bool:
+        with self._marker_array_subscriptions_lock:
+            if topic in self._marker_array_subscriptions:
+                return False
+            sub = self.create_subscription(
+                MarkerArray, topic,
+                lambda msg, t=topic: self._on_marker_array(msg, t), 5,
+            )
+            self._marker_array_subscriptions[topic] = sub
+        self.get_logger().info(f'Subscribed to marker_array topic: {topic}')
+        return True
+
+    def register_viewer_topics(self, payload: dict) -> dict:
+        if not isinstance(payload, dict):
+            return {'ok': False, 'error': 'Invalid payload'}
+
+        image_topics = self._normalize_topic_list(payload.get('image_topics', []))
+        pointcloud_topics = self._normalize_topic_list(payload.get('pointcloud_topics', []))
+        marker_array_topics = self._normalize_topic_list(payload.get('marker_array_topics', []))
+
+        invalid_topics = [
+            topic for topic in (image_topics + pointcloud_topics + marker_array_topics)
+            if not self._is_valid_topic_name(topic)
+        ]
+        if invalid_topics:
+            return {
+                'ok': False,
+                'error': 'Invalid topic name',
+                'invalid_topics': invalid_topics,
+            }
+
+        registered = {
+            'image_topics': [],
+            'pointcloud_topics': [],
+            'marker_array_topics': [],
+        }
+
+        for topic in image_topics:
+            if self._ensure_image_subscription(topic):
+                registered['image_topics'].append(topic)
+
+        for topic in pointcloud_topics:
+            if self._ensure_pointcloud_subscription(topic):
+                registered['pointcloud_topics'].append(topic)
+
+        for topic in marker_array_topics:
+            if self._ensure_marker_array_subscription(topic):
+                registered['marker_array_topics'].append(topic)
+
+        return {
+            'ok': True,
+            'registered': registered,
+            'requested': {
+                'image_topics': image_topics,
+                'pointcloud_topics': pointcloud_topics,
+                'marker_array_topics': marker_array_topics,
+            },
+        }
 
     # ── Accessors ────────────────────────────────────────────────────────
 

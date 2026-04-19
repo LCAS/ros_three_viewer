@@ -22,6 +22,7 @@ class TriggerServiceSimNode(Node):
         self._counter += 1
         response.success = True
         response.message = f'Trigger called {self._counter} time(s)'
+        self.get_logger().info(f'/viewer_demo/trigger called — count={self._counter}')
         return response
 
 

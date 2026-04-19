@@ -178,6 +178,15 @@ function parse3DTopicConfig(el, displayConfig) {
   };
 }
 
+function parseUrdfLinkFiltersAttr(el) {
+  const whitelist = String(el.getAttribute('data-urdf-link-whitelist') || '').trim();
+  const blacklist = String(el.getAttribute('data-urdf-link-blacklist') || '').trim();
+  return {
+    whitelist: whitelist ? new Set(whitelist.split(/\s+/).filter(Boolean)) : null,
+    blacklist: blacklist ? new Set(blacklist.split(/\s+/).filter(Boolean)) : null,
+  };
+}
+
 function getTopicLayer(kind, topicName) {
   const topic = String(topicName || '').trim();
   if (!topic) return TOPIC_LAYER_FALLBACK[kind];
@@ -289,6 +298,8 @@ const viewerWidgets = threeCanvases.map((canvasEl) => {
   composer.addPass(bloomPass);
   composer.addPass(new OutputPass());
 
+  const urdfLinkFilters = parseUrdfLinkFiltersAttr(canvasEl);
+
   return {
     canvasEl,
     renderer,
@@ -298,6 +309,7 @@ const viewerWidgets = threeCanvases.map((canvasEl) => {
     bloomPass,
     displayConfig,
     topicConfig,
+    urdfLinkFilters,
   };
 });
 
@@ -686,7 +698,7 @@ function createLinkVisuals(linkEl, linkGroup) {
   }
 }
 
-async function loadURDF(xmlString) {
+async function loadURDF(xmlString, filters = null) {
   // Clear previous robot
   while (robotRoot.children.length) robotRoot.remove(robotRoot.children[0]);
   for (const k of Object.keys(jointPivots))      delete jointPivots[k];
@@ -709,6 +721,19 @@ async function loadURDF(xmlString) {
     group.name  = `link_${name}`;
     createLinkVisuals(linkEl, group);
     linkGroups[name] = group;
+  }
+
+  // ── Apply link filters (whitelist/blacklist) ──────────────────────────
+  if (filters && (filters.whitelist || filters.blacklist)) {
+    for (const [linkName, linkGroup] of Object.entries(linkGroups)) {
+      let shouldHide = false;
+      if (filters.whitelist) {
+        shouldHide = !filters.whitelist.has(linkName);
+      } else if (filters.blacklist) {
+        shouldHide = filters.blacklist.has(linkName);
+      }
+      linkGroup.visible = !shouldHide;
+    }
   }
 
   // ── Collect joints and wire scene graph ───────────────────────────────
@@ -1591,7 +1616,9 @@ async function fetchURDF() {
     const xml = await res.text();
     if (xml.trim().length > 0) {
       urdfLoaded = true;
-      await loadURDF(xml);
+      // Get filters from first widget that displays URDF
+      const filters = viewerWidgets.find(w => w.displayConfig.showUrdf)?.urdfLinkFilters || null;
+      await loadURDF(xml, filters);
     } else {
       setTimeout(fetchURDF, URDF_RETRY_MS);
     }

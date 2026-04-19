@@ -7,7 +7,6 @@ The node subscribes to /robot_description with transient-local QoS so it can
 receive latched robot descriptions.
 """
 
-import json
 import xml.etree.ElementTree as ET
 
 import rclpy
@@ -64,19 +63,14 @@ class UrdfLinkLister(Node):
             else:
                 links_without_visual.append(name)
 
-        # Print YAML to stdout so users can copy directly into params.yaml.
-        print('urdf_link_whitelist:')
-        for name in links_with_visual:
-            print(f'  - {json.dumps(name)}')
-
-        print('urdf_link_blacklist:')
-        for name in links_without_visual:
-            print(f'  - {json.dumps(name)}')
-
-        print(
-            f'# summary: {len(links_with_visual)}/{len(links)} link(s) include <visual>',
-            flush=True,
-        )
+        # Print whitespace-separated lists for canvas attributes.
+        print('Links with <visual>:')
+        print(' '.join(links_with_visual) if links_with_visual else '(none)')
+        print()
+        print('Links without <visual>:')
+        print(' '.join(links_without_visual) if links_without_visual else '(none)')
+        print()
+        print(f'# Total: {len(links_with_visual)}/{len(links)} link(s) include <visual>', flush=True)
         self._shutdown()
 
     def _shutdown(self) -> None:

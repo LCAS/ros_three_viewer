@@ -95,13 +95,13 @@ For a complete, well-documented list of all parameters with explanations, see [c
 | `port` | `8080` | HTTP/WebSocket port |
 | `pointcloud_max_points` | `8000` | Cloud downsampling limit |
 | `image_jpeg_quality` | `65` | JPEG quality (1–100) |
-| `html_routes` | `{'/': 'index.html', '/modular': 'examples/modular.html'}` | route→HTML file mapping (file paths relative to `web/`) |
+| `html_routes` | `{'/': 'index.html', '/modular': 'examples/modular.html'}` | route→HTML file mapping. Paths can be relative to `web/`, absolute, or use `@package_name@` substitutions. |
 | `fixed_frame` | `base_link` | TF frame used as world origin (RViz-style) |
 | `target_frame` | `base_link` | Fallback TF frame if `fixed_frame` not set |
-| `urdf_link_whitelist` | `[]` | URDF links to display (precedence over blacklist) |
-| `urdf_link_blacklist` | `[]` | URDF links to hide (ignored if whitelist non-empty) |
 
-**URDF filtering precedence:** whitelist (if non-empty) > blacklist (if non-empty) > no filtering.
+**URDF link filtering** (per-canvas via HTML attributes):
+- `data-urdf-link-whitelist="link1 link2 ..."` — whitespace-separated list of links to show (if set, blacklist is ignored)
+- `data-urdf-link-blacklist="link1 link2 ..."` — whitespace-separated list of links to hide (ignored if whitelist is set)
 
 `data-ros-widget="html-panel"` widgets register their `data-topic` dynamically via `/api/register_html_panel_topic`. The content is sanitized with the browser Sanitizer API when available (with a safe plain-text fallback).
 
@@ -136,7 +136,8 @@ ros2 topic pub /viewer_panel_html std_msgs/String \
   - point cloud: `data-pointcloud-topics` (or `data-topic-pointcloud`)
   - markers: `data-marker-array-topics` / `data-marker-topics`
   - image: `data-ros-widget="image-panel"` + `data-topic="/camera/..."`
-- **Extra pages** — configure `html_routes` in params to map custom routes to HTML files in `web/`
+- **Extra pages** — configure `html_routes` in params to map custom routes to HTML files in `web/` or package-resolved paths (for example, `@ros2_web_viewer_example@/web/examples/modular.html`)
+- **Route-relative assets** — files co-located with a routed HTML file are served under that route prefix (for example, `/modular/style.css` for `/modular`)
 - **Trigger buttons** — add `<button data-trigger-service="/my/service">` to panel HTML
 - **Colours / theme** — edit CSS variables in `web/style.css` (`:root` block)
 - **Title / branding** — edit `web/index.html` (`#logo`, `#tagline`)

@@ -12,27 +12,12 @@
     fixed_frame: "base_link"        # TF frame used as world origin (RViz-style)
     target_frame: "base_link"       # Fallback TF frame (used if fixed_frame not set)
 
-    html_routes: "{'/': 'index.html', '/modular': 'examples/modular.html'}"  # Route->html path mapping (paths are relative to web/)
+    html_routes: "{'/': 'index.html', '/modular': 'examples/modular.html'}"  # Route->html path mapping (relative to web/, absolute, or use @package_name@ substitution)
 
     # ────────────────────────────────────────────────────────────────────────────
-    # URDF link display filtering (whitelist has precedence over blacklist)
-    # When whitelist is non-empty, ONLY those links are displayed.
-    # When whitelist is empty and blacklist is non-empty, those links are hidden.
-    # When both are empty, all links are displayed.
-    # ────────────────────────────────────────────────────────────────────────────
-    #urdf_link_whitelist: []         # List of URDF link names to display (priority over blacklist)
-    #urdf_link_blacklist: []         # List of URDF link names to hide (ignored if whitelist non-empty)
-    urdf_link_whitelist:
-      - "shoulder_link"
-      #- "upper_arm_link"
-      - "forearm_link"
-      - "wrist_1_link"
-      - "wrist_2_link"
-      - "wrist_3_link"
-    # urdf_link_blacklist:
-    #   - "world"
-    #   - "base_link"
-    #   - "ft_frame"
+    # URDF link display filtering is controlled per-canvas via HTML attributes:
+    #   data-urdf-link-whitelist="link1 link2 ..."  (space-separated, only show these)
+    #   data-urdf-link-blacklist="link1 link2 ..."  (space-separated, hide these)
     #   - "base"
     #   - "flange"
     #   - "tool0"

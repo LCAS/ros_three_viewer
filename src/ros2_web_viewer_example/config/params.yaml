@@ -7,7 +7,7 @@
     fixed_frame: "base_link"
     target_frame: "base_link"
 
-    html_routes: '{"/": "index.html", "/modular": "examples/modular.html"}'
+    html_routes: '{"/": "index.html", "/modular": "@ros2_web_viewer_example@/web/examples/modular.html"}'
 
     # Throttle websocket broadcasts to reduce per-client traffic.
     joint_states_broadcast_hz: 1.0

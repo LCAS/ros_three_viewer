@@ -21,7 +21,7 @@ from typing import Callable, Set
 
 import uvicorn
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -214,14 +214,57 @@ class ViewerServer:
                 return FileResponse(request_path, media_type='text/html')
             return static_html_page
 
+        def _create_html_route_redirect_handler(canonical_path: str):
+            async def redirect_html_page():
+                return RedirectResponse(url=canonical_path, status_code=307)
+            return redirect_html_page
+
+        def _create_html_asset_handler(route_path: str, asset_root: Path):
+            async def static_html_asset(asset_path: str):
+                # Preserve API/assets namespaces and guard against path traversal.
+                if not asset_path:
+                    return Response(status_code=404)
+
+                candidate = (asset_root / asset_path).resolve()
+                if candidate != asset_root and asset_root not in candidate.parents:
+                    log.warning(
+                        'Blocking path traversal for html route "%s": "%s"',
+                        route_path,
+                        asset_path,
+                    )
+                    return Response(status_code=404)
+                if not candidate.is_file():
+                    return Response(status_code=404)
+
+                return FileResponse(str(candidate))
+
+            return static_html_asset
+
         log.info('Registering %d custom HTML routes', len(self._html_routes))
         for route_path, file_path in self._resolve_static_html_routes().items():
             log.info('Registering custom HTML route: %s -> %s', route_path, file_path)
-            app.add_api_route(
-                route_path,
-                _create_html_route_handler(file_path),
-                methods=['GET'],
-            )
+            html_file = Path(file_path)
+            # For non-root routes, provide a canonical trailing-slash page URL so
+            # relative links like "style.css" resolve under that route.
+            if route_path != '/':
+                canonical_html_path = f'{route_path}/'
+                app.add_api_route(
+                    route_path,
+                    _create_html_route_redirect_handler(canonical_html_path),
+                    methods=['GET'],
+                )
+                app.add_api_route(
+                    canonical_html_path,
+                    _create_html_route_handler(file_path),
+                    methods=['GET'],
+                )
+                app.add_api_route(
+                    f'{route_path}/{{asset_path:path}}',
+                    _create_html_asset_handler(route_path, html_file.parent),
+                    methods=['GET'],
+                )
+            else:
+                app.add_api_route(route_path, _create_html_route_handler(file_path), methods=['GET'])
 
         # Static assets are served from /assets; HTML pages come from html_routes.
         app.mount('/assets', StaticFiles(directory=self.web_dir, html=False), name='assets')
@@ -254,11 +297,6 @@ class ViewerServer:
             else:
                 resolved_file = (web_root / candidate).resolve()
 
-            if web_root not in resolved_file.parents and resolved_file.parent != web_root:
-                log.warning(
-                    'Skipping html route "%s": path "%s" is outside web root "%s"',
-                    route_str, path_str, web_root)
-                continue
             if not resolved_file.is_file():
                 log.warning(
                     'Skipping html route "%s": file "%s" not found',

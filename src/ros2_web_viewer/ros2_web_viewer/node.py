@@ -35,7 +35,6 @@ import os
 import re
 import threading
 import time
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import rclpy
@@ -53,6 +52,12 @@ from visualization_msgs.msg import MarkerArray
 from .pc2_utils import decode_pointcloud2
 from .server import ViewerServer
 
+try:
+    from ament_index_python.packages import get_package_share_directory
+    _HAS_AMENT = True
+except ImportError:
+    _HAS_AMENT = False
+
 log = logging.getLogger('ros2_web_viewer.node')
 log.setLevel(logging.INFO)
 log.addHandler(logging.StreamHandler())
@@ -66,6 +71,7 @@ _LATCHING_QOS = QoSProfile(
 _TRIGGER_TIMEOUT_MIN = 0.1
 _TRIGGER_TIMEOUT_MAX = 30.0
 _SENSOR_THROTTLE_CHECK_PERIOD_SEC = 0.1
+_ROS_PACKAGE_SUBSTITUTION_RE = re.compile(r'@([a-zA-Z0-9_]+)@')
 
 
 # ---------------------------------------------------------------------------
@@ -152,10 +158,6 @@ class WebViewerNode(Node):
         self.declare_parameter('html_routes', '{}')
         self.declare_parameter('fixed_frame', 'base_link')
         self.declare_parameter('target_frame', 'base_link')
-        self.declare_parameter('urdf_link_whitelist', [])
-        self.declare_parameter('urdf_link_blacklist', [])
-        self._urdf_link_whitelist = self._resolve_string_list_parameter('urdf_link_whitelist')
-        self._urdf_link_blacklist = self._resolve_string_list_parameter('urdf_link_blacklist')
         self._fixed_frame = self._resolve_fixed_frame()
         self._joint_states_broadcast_hz = self._resolve_positive_float_parameter('joint_states_broadcast_hz', 1.0)
         self._tf_broadcast_hz = self._resolve_positive_float_parameter('tf_broadcast_hz', 1.0)
@@ -217,58 +219,8 @@ class WebViewerNode(Node):
         if self._pointcloud_topic_broadcast_hz:
             self.get_logger().info(
                 f'Point cloud topic-specific throttle overrides (Hz): {self._pointcloud_topic_broadcast_hz}')
-        if self._urdf_link_whitelist:
-            if self._urdf_link_blacklist:
-                self.get_logger().info(
-                    'Both urdf_link_whitelist and urdf_link_blacklist were provided; '
-                    'using whitelist and ignoring blacklist')
-            self.get_logger().info(
-                f'Using URDF link whitelist ({len(self._urdf_link_whitelist)}): {self._urdf_link_whitelist}')
-        elif self._urdf_link_blacklist:
-            self.get_logger().info(
-                f'Using URDF link blacklist ({len(self._urdf_link_blacklist)}): {self._urdf_link_blacklist}')
 
-    def _resolve_string_list_parameter(self, name: str) -> list[str]:
-        """Return a normalised list[str] from a ROS parameter value.
-        
-        Returns empty list if parameter is not yet initialized (e.g., when loading from file).
-        """
-        try:
-            raw = self.get_parameter(name).value
-        except rclpy.exceptions.ParameterUninitializedException:
-            # Parameter not yet initialized from parameter file; use empty list default
-            return []
 
-        items: list[str] = []
-        if isinstance(raw, (list, tuple, set)):
-            items = [str(v).strip() for v in raw]
-        elif isinstance(raw, str):
-            raw_str = raw.strip()
-            if raw_str.startswith('[') and raw_str.endswith(']'):
-                try:
-                    parsed = ast.literal_eval(raw_str)
-                    if isinstance(parsed, (list, tuple, set)):
-                        items = [str(v).strip() for v in parsed]
-                    else:
-                        items = [str(parsed).strip()]
-                except (ValueError, SyntaxError):
-                    # Fall back to comma-separated parsing.
-                    items = [part.strip() for part in raw_str.split(',')]
-            else:
-                # Support comma-separated strings for convenience.
-                items = [part.strip() for part in raw_str.split(',')]
-        else:
-            items = [str(raw).strip()] if raw is not None else []
-
-        # Preserve order while removing blanks and duplicates.
-        deduped: list[str] = []
-        seen: set[str] = set()
-        for item in items:
-            if not item or item in seen:
-                continue
-            seen.add(item)
-            deduped.append(item)
-        return deduped
 
     def _resolve_positive_float_parameter(self, name: str, default: float) -> float:
         """Return parameter as float. Non-positive values disable throttling."""
@@ -386,61 +338,34 @@ class WebViewerNode(Node):
                 continue
             if not route_str.startswith('/'):
                 route_str = f'/{route_str}'
-            routes[route_str] = path_str
+            resolved_path = self._expand_ros_package_substitutions(path_str)
+            if not resolved_path:
+                self.get_logger().warning(
+                    f'Skipping html route "{route_str}": could not resolve path "{path_str}"')
+                continue
+            routes[route_str] = resolved_path
         if not routes:
             self.get_logger().info('Resolved html_routes is empty; defaulting to / -> index.html')
             return {'/': 'index.html'}
         return routes
 
-    def _filter_urdf_links(self, urdf_xml: str) -> tuple[str, int, int, int]:
-        """Filter URDF links using whitelist/blacklist semantics.
+    def _expand_ros_package_substitutions(self, path_str: str) -> str:
+        """Resolve ROS package substitutions like @package_name@."""
 
-        Precedence: whitelist > blacklist > no filtering.
-        Returns (filtered_xml, original_link_count, kept_link_count, removed_joint_count).
-        """
-        whitelist = set(self._urdf_link_whitelist)
-        blacklist = set(self._urdf_link_blacklist)
-
-        if not whitelist and not blacklist:
-            return urdf_xml, 0, 0, 0
+        def _replace(match: re.Match[str]) -> str:
+            pkg_name = str(match.group(1) or '').strip()
+            if not pkg_name:
+                raise ValueError('empty package substitution')
+            if not _HAS_AMENT:
+                raise RuntimeError('ament index is not available in this environment')
+            return get_package_share_directory(pkg_name)
 
         try:
-            root = ET.fromstring(urdf_xml)
-        except ET.ParseError as exc:
+            return _ROS_PACKAGE_SUBSTITUTION_RE.sub(_replace, path_str)
+        except Exception as exc:
             self.get_logger().warning(
-                f'Failed to parse URDF for link filtering; serving unfiltered URDF: {exc}')
-            return urdf_xml, 0, 0, 0
-
-        link_elements = [el for el in root.findall('link') if el.get('name')]
-        if not link_elements:
-            return urdf_xml, 0, 0, 0
-
-        link_names = [str(el.get('name')) for el in link_elements]
-        link_name_set = set(link_names)
-
-        if whitelist:
-            selected_links = link_name_set.intersection(whitelist)
-        else:
-            selected_links = link_name_set.difference(blacklist)
-
-        for link_el in list(root.findall('link')):
-            name = str(link_el.get('name') or '')
-            if name and name not in selected_links:
-                root.remove(link_el)
-
-        removed_joints = 0
-        for joint_el in list(root.findall('joint')):
-            parent_el = joint_el.find('parent')
-            child_el = joint_el.find('child')
-            parent_link = str(parent_el.get('link') if parent_el is not None else '')
-            child_link = str(child_el.get('link') if child_el is not None else '')
-
-            if parent_link not in selected_links or child_link not in selected_links:
-                root.remove(joint_el)
-                removed_joints += 1
-
-        filtered_xml = ET.tostring(root, encoding='unicode')
-        return filtered_xml, len(link_names), len(selected_links), removed_joints
+                f'Failed to resolve package substitution in html route path "{path_str}": {exc}')
+            return ''
 
     def _resolve_fixed_frame(self) -> str:
         """Pick fixed frame with precedence fixed_frame > target_frame > base_link.
@@ -633,16 +558,8 @@ class WebViewerNode(Node):
     # ── Callbacks ────────────────────────────────────────────────────────
 
     def _on_urdf(self, msg: String):
-        filtered_urdf, total_links, kept_links, removed_joints = self._filter_urdf_links(msg.data)
-        self._urdf = filtered_urdf
-
-        if total_links > 0:
-            self.get_logger().info(
-                'robot_description received '
-                f'({len(msg.data)} bytes), URDF link filter kept {kept_links}/{total_links} links '
-                f'and removed {removed_joints} joints')
-        else:
-            self.get_logger().info(f'robot_description received ({len(msg.data)} bytes)')
+        self._urdf = msg.data
+        self.get_logger().info(f'robot_description received ({len(msg.data)} bytes)')
 
     def _on_joint_states(self, msg: JointState):
         payload = {

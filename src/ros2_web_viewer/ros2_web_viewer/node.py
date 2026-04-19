@@ -10,9 +10,9 @@ Topics subscribed (all configurable via ROS2 parameters):
   /tf_static              tf2_msgs/TFMessage                → JSON message type 'tf' (static=true)
     <viewer topics requested by 3D widgets>                  → dynamic subscriptions via /api/register_viewer_topics
   <html_panel_topics>     std_msgs/String                   → JSON message type 'html_panel' (registered by web widgets)
-  <image_topics>          sensor_msgs/Image                 → JSON message type 'image' (JPEG base64)
-  <pointcloud_topics>     sensor_msgs/PointCloud2           → JSON message type 'pointcloud' (binary b64)
-  <marker_array_topics>   visualization_msgs/MarkerArray    → JSON message type 'marker_array'
+    <image topics requested by widgets>                      → JSON message type 'image' (JPEG base64)
+    <pointcloud topics requested by widgets>                 → JSON message type 'pointcloud' (binary b64)
+    <marker topics requested by widgets>                     → JSON message type 'marker_array'
 
 WebSocket message format  (all JSON):
   { type: 'joint_states', name: [...], position: [...] }
@@ -132,8 +132,6 @@ class WebViewerNode(Node):
         self._trigger_clients: dict[str, Client] = {}
 
         # ── Parameters ──────────────────────────────────────────────────
-        self.declare_parameter('image_topics', ['/camera/image_raw'])
-        self.declare_parameter('pointcloud_topics', ['/points'])
         self.declare_parameter('pointcloud_max_points', 8000)
         self.declare_parameter('image_jpeg_quality', 65)
         self.declare_parameter('html_routes', '{}')
@@ -141,7 +139,6 @@ class WebViewerNode(Node):
         self.declare_parameter('target_frame', 'base_link')
         self.declare_parameter('urdf_link_whitelist', [])
         self.declare_parameter('urdf_link_blacklist', [])
-        self.declare_parameter('marker_array_topics', ['/markers'])
         self._urdf_link_whitelist = self._resolve_string_list_parameter('urdf_link_whitelist')
         self._urdf_link_blacklist = self._resolve_string_list_parameter('urdf_link_blacklist')
         self._fixed_frame = self._resolve_fixed_frame()
@@ -164,15 +161,7 @@ class WebViewerNode(Node):
         self.create_subscription(
             TFMessage, '/tf_static', lambda m: self._on_tf(m, True), _LATCHING_QOS)
 
-        # ── Dynamic topic subscriptions (parameter defaults + runtime registration) ──
-        for topic in self._resolve_string_list_parameter('image_topics'):
-            self._ensure_image_subscription(topic)
-
-        for topic in self._resolve_string_list_parameter('pointcloud_topics'):
-            self._ensure_pointcloud_subscription(topic)
-
-        for topic in self._resolve_string_list_parameter('marker_array_topics'):
-            self._ensure_marker_array_subscription(topic)
+        # ── Dynamic topic subscriptions are registered at runtime from canvas attributes ──
 
         self.get_logger().info('ros2_web_viewer node initialised')
         self.get_logger().info(f'Using fixed frame: {self._fixed_frame}')
@@ -234,8 +223,9 @@ class WebViewerNode(Node):
         try:
             raw = self.get_parameter(name).value
         except rclpy.exceptions.ParameterUninitializedException:
-            self.get_logger().warning(f'HTML routes parameter "{name}" is not yet initialized; no custom routes will be registered')
-            return {}
+            self.get_logger().warning(
+                f'HTML routes parameter "{name}" is not yet initialized; defaulting to / -> index.html')
+            return {'/': 'index.html'}
 
         parsed: dict | None = None
         if isinstance(raw, dict):
@@ -268,7 +258,8 @@ class WebViewerNode(Node):
                 f'Ignoring html_routes of unsupported type: {type(raw).__name__}')
 
         if not parsed:
-            return {}
+            self.get_logger().info('No html_routes configured; defaulting to / -> index.html')
+            return {'/': 'index.html'}
 
         routes: dict[str, str] = {}
         for route, path in parsed.items():
@@ -279,6 +270,9 @@ class WebViewerNode(Node):
             if not route_str.startswith('/'):
                 route_str = f'/{route_str}'
             routes[route_str] = path_str
+        if not routes:
+            self.get_logger().info('Resolved html_routes is empty; defaulting to / -> index.html')
+            return {'/': 'index.html'}
         return routes
 
     def _filter_urdf_links(self, urdf_xml: str) -> tuple[str, int, int, int]:
@@ -470,12 +464,12 @@ class WebViewerNode(Node):
         if not isinstance(payload, dict):
             return {'ok': False, 'error': 'Invalid payload'}
 
-        image_topics = self._normalize_topic_list(payload.get('image_topics', []))
-        pointcloud_topics = self._normalize_topic_list(payload.get('pointcloud_topics', []))
-        marker_array_topics = self._normalize_topic_list(payload.get('marker_array_topics', []))
+        image_topics_list = self._normalize_topic_list(payload.get('image', []))
+        pointcloud_topics_list = self._normalize_topic_list(payload.get('pointcloud', []))
+        marker_topics_list = self._normalize_topic_list(payload.get('markers', []))
 
         invalid_topics = [
-            topic for topic in (image_topics + pointcloud_topics + marker_array_topics)
+            topic for topic in (image_topics_list + pointcloud_topics_list + marker_topics_list)
             if not self._is_valid_topic_name(topic)
         ]
         if invalid_topics:
@@ -486,30 +480,30 @@ class WebViewerNode(Node):
             }
 
         registered = {
-            'image_topics': [],
-            'pointcloud_topics': [],
-            'marker_array_topics': [],
+            'image': [],
+            'pointcloud': [],
+            'markers': [],
         }
 
-        for topic in image_topics:
+        for topic in image_topics_list:
             if self._ensure_image_subscription(topic):
-                registered['image_topics'].append(topic)
+                registered['image'].append(topic)
 
-        for topic in pointcloud_topics:
+        for topic in pointcloud_topics_list:
             if self._ensure_pointcloud_subscription(topic):
-                registered['pointcloud_topics'].append(topic)
+                registered['pointcloud'].append(topic)
 
-        for topic in marker_array_topics:
+        for topic in marker_topics_list:
             if self._ensure_marker_array_subscription(topic):
-                registered['marker_array_topics'].append(topic)
+                registered['markers'].append(topic)
 
         return {
             'ok': True,
             'registered': registered,
             'requested': {
-                'image_topics': image_topics,
-                'pointcloud_topics': pointcloud_topics,
-                'marker_array_topics': marker_array_topics,
+                'image': image_topics_list,
+                'pointcloud': pointcloud_topics_list,
+                'markers': marker_topics_list,
             },
         }
 

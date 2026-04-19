@@ -7,31 +7,12 @@
     port: 8080                      # Port for the HTTP/WebSocket server
 
     # ────────────────────────────────────────────────────────────────────────────
-    # Topics to bridge — adjust to your robot's topic names
-    # ────────────────────────────────────────────────────────────────────────────
-    image_topics:
-      - /camera/image_raw           # sensor_msgs/Image topics to display in viewer
-      - /camera/color/image_raw      # RealSense camera RGB image
-      # - /camera/rgb/image_raw
-      # - /realsense/color/image_raw
-
-    pointcloud_topics:
-      - /points                     # sensor_msgs/PointCloud2 topics to render
-      - /integrated_cloud             # Integrated point cloud from fusion module
-      # - /velodyne_points
-      # - /realsense/depth/color/points
-
-    marker_array_topics:
-      - /markers                    # visualization_msgs/MarkerArray topics to render
-      # - /planning_markers
-
-    # ────────────────────────────────────────────────────────────────────────────
     # URDF & TF configuration
     # ────────────────────────────────────────────────────────────────────────────
     fixed_frame: "base_link"        # TF frame used as world origin (RViz-style)
     target_frame: "base_link"       # Fallback TF frame (used if fixed_frame not set)
 
-    html_routes: "{'/modular': 'examples/modular.html'}"  # Route->html path mapping (paths are relative to web/)
+    html_routes: "{'/': 'index.html', '/modular': 'examples/modular.html'}"  # Route->html path mapping (paths are relative to web/)
 
     # ────────────────────────────────────────────────────────────────────────────
     # URDF link display filtering (whitelist has precedence over blacklist)

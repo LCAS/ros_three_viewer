@@ -83,10 +83,10 @@ html, body {
   inset: 0;
   background-color: #d8d0a8;
   background-image:
-    url('assets/background.jpg'),
+    url('/assets/assets/background.jpg'),
     radial-gradient(ellipse 120% 80% at 10% 90%, rgba(74,65,51,0.35) 0%, transparent 60%),
     radial-gradient(ellipse 80% 120% at 90% 85%, rgba(100,120,80,0.25) 0%, transparent 55%),
-    url('assets/noise.svg');
+    url('/assets/assets/noise.svg');
   background-size: cover, cover, cover, 300px 300px;
   background-position: center, center, center, 0 0;
   opacity: 0.20;

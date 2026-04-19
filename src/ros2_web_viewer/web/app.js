@@ -1524,15 +1524,15 @@ async function registerHtmlPanelTopics() {
 
 async function registerViewerTopics() {
   const payload = {
-    image_topics: [...activeImageTopics],
-    pointcloud_topics: [...activePointCloudTopics],
-    marker_array_topics: [...activeMarkerArrayTopics],
+    image: [...activeImageTopics],
+    pointcloud: [...activePointCloudTopics],
+    markers: [...activeMarkerArrayTopics],
   };
 
   if (
-    payload.image_topics.length === 0
-    && payload.pointcloud_topics.length === 0
-    && payload.marker_array_topics.length === 0
+    payload.image.length === 0
+    && payload.pointcloud.length === 0
+    && payload.markers.length === 0
   ) {
     return;
   }

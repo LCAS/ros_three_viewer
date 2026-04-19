@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PhenAIx · Chelsea Flower Show Digital Twin</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="/assets/style.css" />
 
   <!-- Three.js ES module imports via importmap -->
   <script type="importmap">
@@ -26,6 +26,10 @@
           id="canvas"
           class="ros-viewer-canvas"
           data-ros-widget="3d"
+          data-display="urdf pointcloud markers"
+          data-pointcloud-topics="/points /integrated_cloud"
+          data-marker-topics="/markers"
+          data-image-topics="/camera/image_raw /camera/color/image_raw"
           data-camera-position="2.0 1.6 2.0"
           data-camera-look-at="0 0.5 0"
           data-controls-target="0 0.4 0"
@@ -121,6 +125,6 @@
   </div>
 
   <!-- ── Application ─────────────────────────────────── -->
-  <script type="module" src="app.js"></script>
+  <script type="module" src="/assets/app.js"></script>
 </body>
 </html>

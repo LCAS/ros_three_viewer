@@ -1,11 +1,11 @@
 """FastAPI web server for ros2_web_viewer.
 
 Exposes:
-  GET  /            → index.html (Three.js viewer)
   GET  /api/urdf    → raw URDF XML (204 if not yet received)
   POST /api/trigger → call a std_srvs/Trigger service
     POST /api/register_viewer_topics → subscribe to viewer data topics requested by 3D canvas widgets
   POST /api/register_html_panel_topic → subscribe to a String topic for HTML panel widgets
+    GET  /assets/{path:path} → static frontend assets from web/
   GET  /mesh/{pkg}/{path:path} → proxy mesh files from ROS packages
   GET  <configured html routes> → custom HTML files from web/
   WS   /ws          → bidirectional WebSocket (server → client data stream)
@@ -223,8 +223,8 @@ class ViewerServer:
                 methods=['GET'],
             )
 
-        # Static files last (catches everything else)
-        app.mount('/', StaticFiles(directory=self.web_dir, html=True), name='static')
+        # Static assets are served from /assets; HTML pages come from html_routes.
+        app.mount('/assets', StaticFiles(directory=self.web_dir, html=False), name='assets')
 
         return app
 
@@ -238,11 +238,14 @@ class ViewerServer:
             path_str = str(rel_path or '').strip()
             if not route_str.startswith('/'):
                 route_str = f'/{route_str}'
-            if route_str in ('/', '/ws', '/api', '/api/urdf', '/api/trigger', '/api/register_html_panel_topic', '/api/register_viewer_topics'):
+            if route_str in ('/ws', '/api', '/api/urdf', '/api/trigger', '/api/register_html_panel_topic', '/api/register_viewer_topics', '/assets'):
                 log.warning('Skipping html route "%s": reserved route', route_str)
                 continue
             if route_str.startswith('/api/'):
                 log.warning('Skipping html route "%s": reserved API namespace', route_str)
+                continue
+            if route_str.startswith('/assets/'):
+                log.warning('Skipping html route "%s": reserved assets namespace', route_str)
                 continue
 
             candidate = Path(path_str)

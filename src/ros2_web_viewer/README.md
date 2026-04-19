@@ -66,8 +66,9 @@ Then open **http://localhost:8080** in a browser.
 | `/tf` | `tf2_msgs/TFMessage` | |
 | `/tf_static` | `tf2_msgs/TFMessage` | latching QoS |
 | `<data-topic attributes in HTML panel widgets>` | `std_msgs/String` | topics registered dynamically by frontend |
-| `<image_topics>` | `sensor_msgs/Image` | configurable list |
-| `<pointcloud_topics>` | `sensor_msgs/PointCloud2` | configurable list |
+| `<data-image-topics attributes in 3D widgets>` | `sensor_msgs/Image` | topics registered dynamically by frontend |
+| `<data-pointcloud-topics attributes in 3D widgets>` | `sensor_msgs/PointCloud2` | topics registered dynamically by frontend |
+| `<data-marker-topics attributes in 3D widgets>` | `visualization_msgs/MarkerArray` | topics registered dynamically by frontend |
 
 ## Parameters
 
@@ -92,12 +93,9 @@ For a complete, well-documented list of all parameters with explanations, see [c
 |---|---|---|
 | `host` | `0.0.0.0` | HTTP/WebSocket bind address |
 | `port` | `8080` | HTTP/WebSocket port |
-| `image_topics` | `['/camera/image_raw']` | `sensor_msgs/Image` topics to bridge |
-| `pointcloud_topics` | `['/points']` | `sensor_msgs/PointCloud2` topics to render |
-| `marker_array_topics` | `['/markers']` | `visualization_msgs/MarkerArray` topics to render |
 | `pointcloud_max_points` | `8000` | Cloud downsampling limit |
 | `image_jpeg_quality` | `65` | JPEG quality (1–100) |
-| `html_routes` | `{'/modular': 'examples/modular.html'}` | route→HTML file mapping (file paths relative to `web/`) |
+| `html_routes` | `{'/': 'index.html', '/modular': 'examples/modular.html'}` | route→HTML file mapping (file paths relative to `web/`) |
 | `fixed_frame` | `base_link` | TF frame used as world origin (RViz-style) |
 | `target_frame` | `base_link` | Fallback TF frame if `fixed_frame` not set |
 | `urdf_link_whitelist` | `[]` | URDF links to display (precedence over blacklist) |
@@ -153,9 +151,10 @@ ROS2 System
   └── /points             ──┘                                           updatePointCloud()
 
 FastAPI (Python, background thread)
-  ├── GET  /           →  static files (web/)
+  ├── GET  /assets/... → static files (web/)
   ├── GET  /api/urdf   →  cached URDF string
   ├── POST /api/trigger → std_srvs/Trigger bridge
+  ├── POST /api/register_viewer_topics → dynamic ROS topic registration from canvas attributes
   ├── GET  /mesh/…     →  ament_index mesh proxy
   ├── GET  <html_routes keys> → configured HTML files
   └── WS   /ws         →  broadcast hub

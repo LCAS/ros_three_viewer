@@ -805,7 +805,6 @@ async function loadURDF(xmlString, filters = null) {
   }
 
   robotLoaded = true;
-  setStatus('robot', '🤖 loaded', 'ok');
   console.log('[URDF] Loaded, root link:', rootName,
     '| joints:', Object.keys(jointPivots).length);
 
@@ -835,8 +834,6 @@ function applyJointStates(names, positions) {
       pivot.quaternion.multiplyQuaternions(oQ, delta);
     }
   }
-  const n = names.length;
-  setStatus('joints', `${n} joint${n !== 1 ? 's' : ''} active`, 'ok');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1301,8 +1298,6 @@ function updateMarkerArray(msg) {
     markerMessages.set(key, m);
     markerObjectTopics.set(key, topic);
   }
-  const n = markerObjects.size;
-  setStatus('markers', `${n} marker${n !== 1 ? 's' : ''}`, 'ok');
 }
 
 function updateMarkerPosesFromTF() {
@@ -1362,7 +1357,6 @@ function connectWS() {
           break;
         }
         updatePointCloud(msg.topic, msg.data, msg.count, msg.frame_id);
-        setStatus('cloud', `${msg.count} pts · ${msg.frame_id}`, 'ok');
         break;
 
       case 'marker_array':
@@ -1420,7 +1414,6 @@ const htmlPanelWidgets = Array.from(document.querySelectorAll('[data-ros-widget=
   .filter(Boolean);
 
 function updateImage(dataUri, topic) {
-  let didUpdate = false;
   for (const widget of imagePanelWidgets) {
     if (widget.topicFilter && widget.topicFilter !== topic) continue;
     widget.imageEl.src = dataUri;
@@ -1428,10 +1421,6 @@ function updateImage(dataUri, topic) {
     widget.placeholderEl.style.display = 'none';
     widget.topicEl.textContent = topic.split('/').pop();
     widget.panel.classList.remove('hidden');
-    didUpdate = true;
-  }
-  if (didUpdate) {
-    setStatus('image', topic, 'ok');
   }
 }
 
@@ -1542,8 +1531,6 @@ function updateHtmlPanel(html, topic) {
     }
     widget.topicEl.textContent = topic.split('/').pop();
   }
-
-  setStatus('html', topic, 'ok');
 }
 
 async function registerHtmlPanelTopics() {
@@ -1653,30 +1640,11 @@ function setWsStatus(connected) {
   elWsLabel.textContent = connected ? 'LIVE' : 'OFFLINE';
 }
 
-function setStatus(key, text, state) {
-  // key: 'robot' | 'joints' | 'cloud' | 'image' | 'markers' | 'html'
-  const map = {
-    robot: 'st-robot', joints: 'st-joints',
-    cloud: 'st-cloud', image: 'st-image', markers: 'st-markers',
-    html: 'st-html',
-  };
-  const el = document.getElementById(map[key]);
-  if (!el) return;
-  el.textContent = text;
-  el.className = `status-value ${state ?? ''}`;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Animation loop
 // ─────────────────────────────────────────────────────────────────────────────
 
-let fpsLastTime = performance.now();
-let frameCount = 0;
-const stFPS = document.getElementById('st-fps');
-
 function startWidgetAnimationLoops() {
-  const primaryWidget = viewerWidgets[0] || null;
-
   for (const widget of viewerWidgets) {
     let widgetLastRenderTime = performance.now() - widget.frameIntervalMs;
     widget.renderer.setAnimationLoop((now) => {

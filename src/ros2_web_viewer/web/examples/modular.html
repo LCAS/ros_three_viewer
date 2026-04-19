@@ -76,17 +76,6 @@
     </div>
   </div>
 
-  <div id="status-panel" style="position: fixed; right: 16px; bottom: 16px; z-index: 30; width: 280px;">
-    <div id="status-header">System Status</div>
-    <div class="status-row"><span class="status-label">ROBOT</span><span class="status-value warn" id="st-robot">waiting…</span></div>
-    <div class="status-row"><span class="status-label">JOINTS</span><span class="status-value" id="st-joints">—</span></div>
-    <div class="status-row"><span class="status-label">CLOUD</span><span class="status-value" id="st-cloud">—</span></div>
-    <div class="status-row"><span class="status-label">MARKERS</span><span class="status-value" id="st-markers">—</span></div>
-    <div class="status-row"><span class="status-label">IMAGE</span><span class="status-value" id="st-image">—</span></div>
-    <div class="status-row"><span class="status-label">HTML</span><span class="status-value" id="st-html">—</span></div>
-    <div class="status-row"><span class="status-label">FPS</span><span class="status-value" id="st-fps">—</span></div>
-  </div>
-
   <div id="image-panel" class="hidden" data-ros-widget="image-panel" data-topic="/camera/color/image_raw" style="display:none;">
     <div id="image-header"><span>SENSOR FEED</span><span id="image-topic-label" data-role="image-topic-label">—</span></div>
     <img id="camera-image" alt="camera feed" style="display:none" />

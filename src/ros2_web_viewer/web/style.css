@@ -244,64 +244,6 @@ html, body {
   border-color: var(--danger);
 }
 
-/* ── Status panel ────────────────────────────────────────── */
-#status-panel {
-  width: 100%;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
-  backdrop-filter: var(--panel-blur);
-  overflow: hidden;
-}
-
-#status-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
-  border-bottom: 1px solid var(--panel-border);
-  font-family: var(--mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--cream);
-}
-#status-header::before {
-  content: '';
-  display: block;
-  width: 2px; height: 12px;
-  background: var(--cream);
-  border-radius: 1px;
-}
-
-.status-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 5px 12px;
-  font-family: var(--mono);
-  font-size: 0.62rem;
-  border-bottom: 1px solid rgba(224,220,169,0.06);
-}
-.status-row:last-child { border-bottom: none; }
-
-.status-label {
-  color: var(--cream-dim);
-  flex-shrink: 0;
-  width: 60px;
-  letter-spacing: 0.06em;
-}
-.status-value {
-  color: var(--cream);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.status-value.ok   { color: var(--good); }
-.status-value.warn { color: var(--warn); }
-.status-value.bad  { color: var(--danger); }
-
 /* ── Image panel ─────────────────────────────────────────── */
 #image-panel {
   width: 100%;

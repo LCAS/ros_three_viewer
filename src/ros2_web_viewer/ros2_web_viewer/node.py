@@ -14,21 +14,25 @@ Topics subscribed (all configurable via ROS2 parameters):
 
 WebSocket message format  (all JSON):
   { type: 'joint_states', name: [...], position: [...] }
-  { type: 'tf', static: bool, transforms: [{parent,child,tx,ty,tz,rx,ry,rz,rw},...] }
+  { type: 'tf', static: bool, fixed_frame: str,
+    transforms: [{parent,child,tx,ty,tz,rx,ry,rz,rw},...] }
   { type: 'image',      topic, data: 'data:image/jpeg;base64,...' }
   { type: 'pointcloud', topic, frame_id, count, data: '<base64 packed float32>' }
      data layout: N × [x y z r g b] each a float32 (24 bytes/point)
+  { type: 'html_panel', topic, data: '<html string>' }
   { type: 'marker_array', topic, markers: [{ns, id, type, action, frame_id,
      px, py, pz, rx, ry, rz, rw, sx, sy, sz, r, g, b, a,
      text, mesh_resource, points: [[x,y,z],...], colors: [[r,g,b,a],...]},...] }
 """
 
 import base64
+import ast
 import json
 import logging
 import math
 import os
 import threading
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import rclpy
@@ -62,18 +66,33 @@ _LATCHING_QOS = QoSProfile(
 
 def _find_web_dir() -> str:
     """Locate the web/ directory whether running installed or from source."""
+    candidates = []
+
     try:
         from ament_index_python.packages import get_package_share_directory
         share = get_package_share_directory('ros2_web_viewer')
-        candidate = os.path.join(share, 'web')
-        if os.path.isdir(candidate):
-            log.info(f'Web assets found in package share directory: {candidate}')
-            return candidate
+        candidates.append(os.path.join(share, 'web'))
     except Exception:
-        log.warning('ros2_web_viewer package not found; attempting to locate web assets from source tree')
-        pass
-    # Running from source tree
-    log.warning('ros2_web_viewer running from source; web assets may not be found')
+        log.warning('ros2_web_viewer package not found via ament index; trying source tree fallback')
+
+    # Fallback: relative to this file (works from source and with symlink-install)
+    candidates.append(str(Path(__file__).parent.parent / 'web'))
+
+    for candidate in candidates:
+        if not os.path.isdir(candidate):
+            continue
+        # Resolve symlinks on a probe file so that Starlette's StaticFiles
+        # (which calls os.path.realpath on both directory and file paths when
+        # checking for path-traversal) receives the real directory path.
+        # This is required when built with `colcon --symlink-install`, where
+        # files in the share directory are symlinks that resolve outside it.
+        probe = os.path.join(candidate, 'index.html')
+        if os.path.isfile(probe):
+            real_dir = os.path.dirname(os.path.realpath(probe))
+            log.info(f'Web assets found at: {real_dir}')
+            return real_dir
+
+    log.warning('ros2_web_viewer: could not locate web assets directory; serving may fail')
     return str(Path(__file__).parent.parent / 'web')
 
 
@@ -87,14 +106,27 @@ class WebViewerNode(Node):
         super().__init__('ros2_web_viewer')
         self._server = server
         self._urdf: str | None = None
+        self._tf_cache_lock = threading.Lock()
+        self._tf_static_cache: dict[str, dict] = {}
+        self._tf_dynamic_cache: dict[str, dict] = {}
+        self._marker_cache_lock = threading.Lock()
+        self._marker_cache_by_topic: dict[str, dict[str, dict]] = {}
 
         # ── Parameters ──────────────────────────────────────────────────
         self.declare_parameter('image_topics', ['/camera/image_raw'])
         self.declare_parameter('pointcloud_topics', ['/points'])
         self.declare_parameter('pointcloud_max_points', 8000)
         self.declare_parameter('image_jpeg_quality', 65)
+        self.declare_parameter('html_panel_topic', '/viewer_panel_html')
+        self.declare_parameter('fixed_frame', 'base_link')
         self.declare_parameter('target_frame', 'base_link')
+        self.declare_parameter('urdf_link_whitelist', [])
+        self.declare_parameter('urdf_link_blacklist', [])
         self.declare_parameter('marker_array_topics', ['/markers'])
+        self._urdf_link_whitelist = self._resolve_string_list_parameter('urdf_link_whitelist')
+        self._urdf_link_blacklist = self._resolve_string_list_parameter('urdf_link_blacklist')
+        self._fixed_frame = self._resolve_fixed_frame()
+        self._server.set_client_init_messages_getter(self._get_ws_init_messages)
 
         # ── Core subscriptions ───────────────────────────────────────────
         self.create_subscription(
@@ -128,7 +160,136 @@ class WebViewerNode(Node):
                 lambda msg, t=topic: self._on_marker_array(msg, t), 5)
             self.get_logger().info(f'Subscribed to marker_array topic: {topic}')
 
+        html_panel_topic = str(self.get_parameter('html_panel_topic').value or '').strip()
+        if html_panel_topic:
+            self.create_subscription(
+                String, html_panel_topic,
+                lambda msg, t=html_panel_topic: self._on_html_panel(msg, t), 5)
+            self.get_logger().info(f'Subscribed to html panel topic: {html_panel_topic}')
+
         self.get_logger().info('ros2_web_viewer node initialised')
+        self.get_logger().info(f'Using fixed frame: {self._fixed_frame}')
+        if self._urdf_link_whitelist:
+            if self._urdf_link_blacklist:
+                self.get_logger().info(
+                    'Both urdf_link_whitelist and urdf_link_blacklist were provided; '
+                    'using whitelist and ignoring blacklist')
+            self.get_logger().info(
+                f'Using URDF link whitelist ({len(self._urdf_link_whitelist)}): {self._urdf_link_whitelist}')
+        elif self._urdf_link_blacklist:
+            self.get_logger().info(
+                f'Using URDF link blacklist ({len(self._urdf_link_blacklist)}): {self._urdf_link_blacklist}')
+
+    def _resolve_string_list_parameter(self, name: str) -> list[str]:
+        """Return a normalised list[str] from a ROS parameter value.
+        
+        Returns empty list if parameter is not yet initialized (e.g., when loading from file).
+        """
+        try:
+            raw = self.get_parameter(name).value
+        except rclpy.exceptions.ParameterUninitializedException:
+            # Parameter not yet initialized from parameter file; use empty list default
+            return []
+
+        items: list[str] = []
+        if isinstance(raw, (list, tuple, set)):
+            items = [str(v).strip() for v in raw]
+        elif isinstance(raw, str):
+            raw_str = raw.strip()
+            if raw_str.startswith('[') and raw_str.endswith(']'):
+                try:
+                    parsed = ast.literal_eval(raw_str)
+                    if isinstance(parsed, (list, tuple, set)):
+                        items = [str(v).strip() for v in parsed]
+                    else:
+                        items = [str(parsed).strip()]
+                except (ValueError, SyntaxError):
+                    # Fall back to comma-separated parsing.
+                    items = [part.strip() for part in raw_str.split(',')]
+            else:
+                # Support comma-separated strings for convenience.
+                items = [part.strip() for part in raw_str.split(',')]
+        else:
+            items = [str(raw).strip()] if raw is not None else []
+
+        # Preserve order while removing blanks and duplicates.
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for item in items:
+            if not item or item in seen:
+                continue
+            seen.add(item)
+            deduped.append(item)
+        return deduped
+
+    def _filter_urdf_links(self, urdf_xml: str) -> tuple[str, int, int, int]:
+        """Filter URDF links using whitelist/blacklist semantics.
+
+        Precedence: whitelist > blacklist > no filtering.
+        Returns (filtered_xml, original_link_count, kept_link_count, removed_joint_count).
+        """
+        whitelist = set(self._urdf_link_whitelist)
+        blacklist = set(self._urdf_link_blacklist)
+
+        if not whitelist and not blacklist:
+            return urdf_xml, 0, 0, 0
+
+        try:
+            root = ET.fromstring(urdf_xml)
+        except ET.ParseError as exc:
+            self.get_logger().warning(
+                f'Failed to parse URDF for link filtering; serving unfiltered URDF: {exc}')
+            return urdf_xml, 0, 0, 0
+
+        link_elements = [el for el in root.findall('link') if el.get('name')]
+        if not link_elements:
+            return urdf_xml, 0, 0, 0
+
+        link_names = [str(el.get('name')) for el in link_elements]
+        link_name_set = set(link_names)
+
+        if whitelist:
+            selected_links = link_name_set.intersection(whitelist)
+        else:
+            selected_links = link_name_set.difference(blacklist)
+
+        for link_el in list(root.findall('link')):
+            name = str(link_el.get('name') or '')
+            if name and name not in selected_links:
+                root.remove(link_el)
+
+        removed_joints = 0
+        for joint_el in list(root.findall('joint')):
+            parent_el = joint_el.find('parent')
+            child_el = joint_el.find('child')
+            parent_link = str(parent_el.get('link') if parent_el is not None else '')
+            child_link = str(child_el.get('link') if child_el is not None else '')
+
+            if parent_link not in selected_links or child_link not in selected_links:
+                root.remove(joint_el)
+                removed_joints += 1
+
+        filtered_xml = ET.tostring(root, encoding='unicode')
+        return filtered_xml, len(link_names), len(selected_links), removed_joints
+
+    def _resolve_fixed_frame(self) -> str:
+        """Pick fixed frame with precedence fixed_frame > target_frame > base_link.
+
+        Leading slashes are stripped to normalise TF frame IDs.
+        Returns default 'base_link' if parameters are not yet initialized.
+        """
+        try:
+            fixed_frame = str(self.get_parameter('fixed_frame').value or '').strip()
+        except rclpy.exceptions.ParameterUninitializedException:
+            fixed_frame = ''
+
+        try:
+            target_frame = str(self.get_parameter('target_frame').value or '').strip()
+        except rclpy.exceptions.ParameterUninitializedException:
+            target_frame = ''
+
+        selected = fixed_frame or target_frame or 'base_link'
+        return selected.lstrip('/')
 
     # ── Accessors ────────────────────────────────────────────────────────
 
@@ -139,8 +300,16 @@ class WebViewerNode(Node):
     # ── Callbacks ────────────────────────────────────────────────────────
 
     def _on_urdf(self, msg: String):
-        self._urdf = msg.data
-        self.get_logger().info(f'robot_description received ({len(msg.data)} bytes)')
+        filtered_urdf, total_links, kept_links, removed_joints = self._filter_urdf_links(msg.data)
+        self._urdf = filtered_urdf
+
+        if total_links > 0:
+            self.get_logger().info(
+                'robot_description received '
+                f'({len(msg.data)} bytes), URDF link filter kept {kept_links}/{total_links} links '
+                f'and removed {removed_joints} joints')
+        else:
+            self.get_logger().info(f'robot_description received ({len(msg.data)} bytes)')
 
     def _on_joint_states(self, msg: JointState):
         payload = {
@@ -163,8 +332,57 @@ class WebViewerNode(Node):
                 'rx': ro.x, 'ry': ro.y, 'rz': ro.z, 'rw': ro.w,
             })
         if transforms:
-            payload = {'type': 'tf', 'static': static, 'transforms': transforms}
+            with self._tf_cache_lock:
+                cache = self._tf_static_cache if static else self._tf_dynamic_cache
+                for tf in transforms:
+                    child = str(tf.get('child', '') or '').strip()
+                    if child:
+                        cache[child] = tf
+            payload = {
+                'type': 'tf',
+                'static': static,
+                'fixed_frame': self._fixed_frame,
+                'transforms': transforms,
+            }
             self._server.broadcast_threadsafe(json.dumps(payload))
+
+    def _get_ws_init_messages(self) -> list[str]:
+        """Return cached state that new websocket clients need immediately."""
+        messages: list[str] = []
+        with self._tf_cache_lock:
+            static_transforms = list(self._tf_static_cache.values())
+            dynamic_transforms = list(self._tf_dynamic_cache.values())
+        with self._marker_cache_lock:
+            marker_snapshots = {
+                topic: list(marker_map.values())
+                for topic, marker_map in self._marker_cache_by_topic.items()
+                if marker_map
+            }
+
+        if static_transforms:
+            messages.append(json.dumps({
+                'type': 'tf',
+                'static': True,
+                'fixed_frame': self._fixed_frame,
+                'transforms': static_transforms,
+            }))
+
+        if dynamic_transforms:
+            messages.append(json.dumps({
+                'type': 'tf',
+                'static': False,
+                'fixed_frame': self._fixed_frame,
+                'transforms': dynamic_transforms,
+            }))
+
+        for topic, markers in marker_snapshots.items():
+            messages.append(json.dumps({
+                'type': 'marker_array',
+                'topic': topic,
+                'markers': markers,
+            }))
+
+        return messages
 
     def _on_image(self, msg: Image, topic: str):
         try:
@@ -212,36 +430,66 @@ class WebViewerNode(Node):
 
     def _on_marker_array(self, msg: MarkerArray, topic: str):
         markers = []
-        for m in msg.markers:
-            markers.append({
-                'ns': m.ns,
-                'id': m.id,
-                'type': m.type,
-                'action': m.action,
-                'frame_id': m.header.frame_id,
-                'px': float(m.pose.position.x),
-                'py': float(m.pose.position.y),
-                'pz': float(m.pose.position.z),
-                'rx': float(m.pose.orientation.x),
-                'ry': float(m.pose.orientation.y),
-                'rz': float(m.pose.orientation.z),
-                'rw': float(m.pose.orientation.w),
-                'sx': float(m.scale.x),
-                'sy': float(m.scale.y),
-                'sz': float(m.scale.z),
-                'r': float(m.color.r),
-                'g': float(m.color.g),
-                'b': float(m.color.b),
-                'a': float(m.color.a),
-                'text': m.text,
-                'mesh_resource': m.mesh_resource,
-                'points': [[float(p.x), float(p.y), float(p.z)] for p in m.points],
-                'colors': [[float(c.r), float(c.g), float(c.b), float(c.a)] for c in m.colors],
-            })
+        with self._marker_cache_lock:
+            marker_cache = self._marker_cache_by_topic.setdefault(topic, {})
+
+            for m in msg.markers:
+                marker = {
+                    'ns': m.ns,
+                    'id': m.id,
+                    'type': m.type,
+                    'action': m.action,
+                    'frame_id': m.header.frame_id,
+                    'px': float(m.pose.position.x),
+                    'py': float(m.pose.position.y),
+                    'pz': float(m.pose.position.z),
+                    'rx': float(m.pose.orientation.x),
+                    'ry': float(m.pose.orientation.y),
+                    'rz': float(m.pose.orientation.z),
+                    'rw': float(m.pose.orientation.w),
+                    'sx': float(m.scale.x),
+                    'sy': float(m.scale.y),
+                    'sz': float(m.scale.z),
+                    'r': float(m.color.r),
+                    'g': float(m.color.g),
+                    'b': float(m.color.b),
+                    'a': float(m.color.a),
+                    'text': m.text,
+                    'mesh_resource': m.mesh_resource,
+                    'points': [[float(p.x), float(p.y), float(p.z)] for p in m.points],
+                    'colors': [[float(c.r), float(c.g), float(c.b), float(c.a)] for c in m.colors],
+                }
+                markers.append(marker)
+
+                key = f"{marker['ns']}:{marker['id']}"
+                action = int(marker['action'])
+                if action == 2:  # DELETE
+                    marker_cache.pop(key, None)
+                elif action == 3:  # DELETEALL
+                    ns = str(marker['ns'] or '').strip()
+                    if ns:
+                        for cache_key in [k for k in marker_cache.keys() if k.startswith(f'{ns}:')]:
+                            marker_cache.pop(cache_key, None)
+                    else:
+                        marker_cache.clear()
+                else:  # ADD / MODIFY
+                    marker_cache[key] = marker
+
+            if not marker_cache:
+                self._marker_cache_by_topic.pop(topic, None)
+
         payload = {
             'type': 'marker_array',
             'topic': topic,
             'markers': markers,
+        }
+        self._server.broadcast_threadsafe(json.dumps(payload))
+
+    def _on_html_panel(self, msg: String, topic: str):
+        payload = {
+            'type': 'html_panel',
+            'topic': topic,
+            'data': msg.data,
         }
         self._server.broadcast_threadsafe(json.dumps(payload))
 

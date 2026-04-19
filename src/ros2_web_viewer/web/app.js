@@ -33,19 +33,27 @@ const WS_URL        = `ws://${location.host}/ws`;
 // ─────────────────────────────────────────────────────────────────────────────
 
 const canvas = document.getElementById('canvas');
+const htmlPanelContent = document.getElementById('html-panel-content');
+const htmlTopicLabel = document.getElementById('html-topic-label');
 
 const renderer = new THREE.WebGLRenderer({
   canvas,
   antialias: true,
-  powerPreference: 'high-performance',
+  powerPreference: 'default',
 });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = false;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+function getCanvasSize() {
+  return {
+    width: Math.max(canvas.clientWidth, 1),
+    height: Math.max(canvas.clientHeight, 1),
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Scene
@@ -53,14 +61,21 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1e1408);
-scene.fog = new THREE.FogExp2(0x1e1408, 0.05);
+//scene.fog = new THREE.FogExp2(0x1e1408, 0.05);
+
+// ROS (X forward, Y left, Z up) → Three (X right, Y up, Z out) basis change
+const ROS_TO_THREE_QUAT = new THREE.Quaternion()
+  .setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0, 'XYZ'));
+const rosSceneRoot = new THREE.Group();
+rosSceneRoot.name = 'ros_scene_root';
+rosSceneRoot.quaternion.copy(ROS_TO_THREE_QUAT);
+scene.add(rosSceneRoot);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Camera & controls
 // ─────────────────────────────────────────────────────────────────────────────
 
-const camera = new THREE.PerspectiveCamera(
-  55, window.innerWidth / window.innerHeight, 0.001, 60);
+const camera = new THREE.PerspectiveCamera(55, 1.0, 0.001, 60);
 camera.position.set(2.0, 1.6, 2.0);
 camera.lookAt(0, 0.5, 0);
 
@@ -71,7 +86,7 @@ controls.dampingFactor = 0.06;
 controls.minDistance = 0.1;
 controls.maxDistance = 20;
 controls.autoRotate = true;
-controls.autoRotateSpeed = 0.35;
+controls.autoRotateSpeed = 0.75;
 controls.update();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -81,8 +96,9 @@ controls.update();
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 
+const initialCanvasSize = getCanvasSize();
 const bloomPass = new UnrealBloomPass(
-  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  new THREE.Vector2(initialCanvasSize.width, initialCanvasSize.height),
   /*strength*/ 0.25, /*radius*/ 0.5, /*threshold*/ 0.88);
 composer.addPass(bloomPass);
 
@@ -146,7 +162,7 @@ scene.add(groundMesh);
   axGroup.add(mkAxis(0xff2244, new THREE.Euler(0, 0, -Math.PI / 2)));  // X red
   axGroup.add(mkAxis(0x22ff44, new THREE.Euler(0, 0, 0)));              // Y green
   axGroup.add(mkAxis(0x2244ff, new THREE.Euler(Math.PI / 2, 0, 0)));   // Z blue
-  scene.add(axGroup);
+  rosSceneRoot.add(axGroup);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -199,7 +215,9 @@ const cloudMat = new THREE.ShaderMaterial({
 
 const pointCloud = new THREE.Points(cloudGeo, cloudMat);
 pointCloud.frustumCulled = false;
-scene.add(pointCloud);
+rosSceneRoot.add(pointCloud);
+
+let pointCloudFrameId = '';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Viridis colourmap (JS-side, for any unmapped points)
@@ -250,6 +268,25 @@ function updatePointCloud(b64, count, frameId) {
   cloudGeo.setDrawRange(0, n);
   cloudGeo.attributes.position.needsUpdate = true;
   cloudGeo.attributes.aColor.needsUpdate   = true;
+
+  pointCloudFrameId = normalizeFrameId(frameId);
+  updatePointCloudPoseFromTF();
+}
+
+function updatePointCloudPoseFromTF() {
+  const frameMat = getFrameMatrixInFixedFrame(pointCloudFrameId, 'pointcloud');
+  if (frameMat) {
+    clearTfWarning(`pointcloud-fallback:${pointCloudFrameId || 'empty'}`);
+    frameMat.decompose(pointCloud.position, pointCloud.quaternion, pointCloud.scale);
+  } else {
+    warnTfOnce(
+      `pointcloud-fallback:${pointCloudFrameId || 'empty'}`,
+      `[TF] Point cloud pose fallback to identity because transform lookup failed for frame "${pointCloudFrameId || '<empty>'}"`,
+    );
+    pointCloud.position.set(0, 0, 0);
+    pointCloud.quaternion.identity();
+    pointCloud.scale.set(1, 1, 1);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -258,7 +295,7 @@ function updatePointCloud(b64, count, frameId) {
 
 const robotRoot = new THREE.Group();
 robotRoot.name = 'robot_root';
-scene.add(robotRoot);
+rosSceneRoot.add(robotRoot);
 
 // Maps populated when URDF is parsed
 const jointPivots       = {};   // joint name → Group (the pivot at joint origin)
@@ -269,6 +306,7 @@ const jointOriginPos    = {};   // joint name → Vector3   (initial, from origi
 
 let   robotLoaded       = false;
 let   pendingJointState = null;
+let   robotBaseFrame    = 'base_link';
 
 // ── Material factory ──────────────────────────────────────────────────────
 
@@ -298,8 +336,9 @@ function parseOriginEl(el) {
 
 function applyOrigin(obj, origin) {
   obj.position.set(origin.xyz[0], origin.xyz[1], origin.xyz[2]);
+  // URDF rpy is fixed-axis roll(X), pitch(Y), yaw(Z), equivalent to intrinsic ZYX.
   obj.quaternion.setFromEuler(
-    new THREE.Euler(origin.rpy[0], origin.rpy[1], origin.rpy[2], 'XYZ'));
+    new THREE.Euler(origin.rpy[0], origin.rpy[1], origin.rpy[2], 'ZYX'));
 }
 
 function parseMaterialColor(visualEl) {
@@ -380,20 +419,24 @@ function createLinkVisuals(linkEl, linkGroup) {
         const loader = new ColladaLoader();
         loader.load(url, (collada) => {
           const daeScene = collada.scene;
+          const daeRoot = new THREE.Group();
+
           if (scaleAttr) {
             const s = scaleAttr.trim().split(/\s+/).map(Number);
             daeScene.scale.set(s[0] ?? 1, s[1] ?? 1, s[2] ?? 1);
           }
           daeScene.traverse(child => {
             if (child.isMesh) {
+              child.rotation.x += Math.PI / 2;
               child.castShadow = true;
               child.receiveShadow = true;
               // Keep the DAE's own materials; they carry colour & texture info
             }
           });
-          applyOrigin(daeScene, origin);
+          applyOrigin(daeRoot, origin);
+          daeRoot.add(daeScene);
           linkGroup.remove(ph);
-          linkGroup.add(daeScene);
+          linkGroup.add(daeRoot);
         }, undefined, () => { /* silently keep placeholder */ });
         continue;  // handled async
       }
@@ -486,6 +529,8 @@ async function loadURDF(xmlString) {
                    ?? Object.keys(linkGroups)[0];
   if (rootName && linkGroups[rootName]) {
     robotRoot.add(linkGroups[rootName]);
+    robotBaseFrame = normalizeFrameId(rootName) || 'base_link';
+    updateRobotPoseFromTF();
   }
 
   robotLoaded = true;
@@ -528,15 +573,119 @@ function applyJointStates(names, positions) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const tfTree = {};  // frame_id → { parent, tx, ty, tz, rx, ry, rz, rw }
+let fixedFrame = 'base_link';
+let fixedFrameLocked = false;
+const tfWarningKeys = new Set();
 
-function applyTF(transforms, _static) {
+function warnTfOnce(key, message) {
+  if (tfWarningKeys.has(key)) return;
+  tfWarningKeys.add(key);
+  console.warn(message);
+}
+
+function clearTfWarning(key) {
+  tfWarningKeys.delete(key);
+}
+
+function normalizeFrameId(frameId) {
+  return (frameId || '').trim().replace(/^\/+/, '');
+}
+
+function applyTF(transforms, _static, fixedFrameFromMsg) {
+  if (fixedFrameFromMsg) {
+    const requestedFixedFrame = normalizeFrameId(fixedFrameFromMsg) || 'base_link';
+    if (!fixedFrameLocked) {
+      fixedFrame = requestedFixedFrame;
+      fixedFrameLocked = true;
+    } else if (requestedFixedFrame !== fixedFrame) {
+      console.warn(
+        `[TF] Ignoring fixed frame change from "${fixedFrame}" to "${requestedFixedFrame}"`,
+      );
+    }
+  }
   for (const t of transforms) {
-    tfTree[t.child] = {
-      parent: t.parent,
+    const child = normalizeFrameId(t.child);
+    if (!child) continue;
+    tfTree[child] = {
+      parent: normalizeFrameId(t.parent),
       tx: t.tx, ty: t.ty, tz: t.tz,
       rx: t.rx, ry: t.ry, rz: t.rz, rw: t.rw,
     };
   }
+  updateRobotPoseFromTF();
+  updatePointCloudPoseFromTF();
+  updateMarkerPosesFromTF();
+}
+
+function getFrameToRootMatrix(frameId) {
+  const chain = [];
+  let f = normalizeFrameId(frameId);
+  const visited = new Set();
+  while (f && tfTree[f] && !visited.has(f)) {
+    visited.add(f);
+    chain.push(tfTree[f]);
+    f = tfTree[f].parent;
+  }
+  const mat = new THREE.Matrix4();
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const t = chain[i];
+    mat.multiply(new THREE.Matrix4().compose(
+      new THREE.Vector3(t.tx, t.ty, t.tz),
+      new THREE.Quaternion(t.rx, t.ry, t.rz, t.rw),
+      new THREE.Vector3(1, 1, 1),
+    ));
+  }
+  return mat;
+}
+
+function getRootFrameId(frameId) {
+  let f = normalizeFrameId(frameId);
+  const visited = new Set();
+  while (f && tfTree[f] && !visited.has(f)) {
+    visited.add(f);
+    f = tfTree[f].parent;
+  }
+  return f;
+}
+
+function getFrameMatrixInFixedFrame(frameId, consumer = 'unknown') {
+  const f = normalizeFrameId(frameId);
+  if (!f) {
+    warnTfOnce(
+      `empty:${consumer}`,
+      `[TF] Cannot resolve transform for ${consumer}: empty frame_id`,
+    );
+    return null;
+  }
+  if (f === fixedFrame) {
+    clearTfWarning(`disconnected:${consumer}:${f}:${fixedFrame}`);
+    return new THREE.Matrix4();
+  }
+  const fixedRoot = getRootFrameId(fixedFrame);
+  const frameRoot = getRootFrameId(f);
+  if (fixedRoot && frameRoot && fixedRoot !== frameRoot) {
+    warnTfOnce(
+      `disconnected:${consumer}:${f}:${fixedFrame}`,
+      `[TF] Cannot resolve transform for ${consumer}: frame "${f}" is in tree rooted at "${frameRoot}", but fixed_frame is "${fixedFrame}" rooted at "${fixedRoot}"`,
+    );
+    return null;
+  }
+  clearTfWarning(`disconnected:${consumer}:${f}:${fixedFrame}`);
+  const rootToFixed = getFrameToRootMatrix(fixedFrame);
+  const rootToFrame = getFrameToRootMatrix(f);
+  return rootToFixed.clone().invert().multiply(rootToFrame);
+}
+
+function updateRobotPoseFromTF() {
+  if (!robotLoaded) return;
+  const frameMat = getFrameMatrixInFixedFrame(robotBaseFrame, 'robot');
+  if (!frameMat) {
+    robotRoot.position.set(0, 0, 0);
+    robotRoot.quaternion.identity();
+    robotRoot.scale.set(1, 1, 1);
+    return;
+  }
+  frameMat.decompose(robotRoot.position, robotRoot.quaternion, robotRoot.scale);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -553,32 +702,16 @@ const MK = {
 
 const markerRoot = new THREE.Group();
 markerRoot.name = 'markers';
-scene.add(markerRoot);
+rosSceneRoot.add(markerRoot);
 
 // "ns:id" → Object3D
 const markerObjects = new Map();
+// "ns:id" → latest marker payload (for TF-driven pose refresh)
+const markerMessages = new Map();
 
 // Walk TF chain to compute world-space matrix of a named frame
 function getFrameWorldMatrix(frameId) {
-  const chain = [];
-  let f = frameId;
-  const visited = new Set();
-  while (f && tfTree[f] && !visited.has(f)) {
-    visited.add(f);
-    chain.push(tfTree[f]);
-    f = tfTree[f].parent;
-  }
-  // Compose from root (last) down to frameId (first)
-  const mat = new THREE.Matrix4();
-  for (let i = chain.length - 1; i >= 0; i--) {
-    const t = chain[i];
-    mat.multiply(new THREE.Matrix4().compose(
-      new THREE.Vector3(t.tx, t.ty, t.tz),
-      new THREE.Quaternion(t.rx, t.ry, t.rz, t.rw),
-      new THREE.Vector3(1, 1, 1),
-    ));
-  }
-  return mat;
+  return getFrameMatrixInFixedFrame(frameId, 'marker') || new THREE.Matrix4();
 }
 
 // Standard MeshStandardMaterial for markers
@@ -641,14 +774,9 @@ function createMarkerObject(m) {
       const headR  = m.sz > 0 ? m.sz / 2 : shaftR * 2.5;
 
       if (m.points && m.points.length >= 2) {
-        // points[0] → points[1] in the reference frame (override pose)
-        const frameMat = getFrameWorldMatrix(m.frame_id);
-        const fPos = new THREE.Vector3();
-        const fQuat = new THREE.Quaternion();
-        frameMat.decompose(fPos, fQuat, new THREE.Vector3());
-
-        const pStart = new THREE.Vector3(...m.points[0]).applyQuaternion(fQuat).add(fPos);
-        const pEnd   = new THREE.Vector3(...m.points[1]).applyQuaternion(fQuat).add(fPos);
+        // points[0] → points[1] in marker reference frame (override pose)
+        const pStart = new THREE.Vector3(...m.points[0]);
+        const pEnd   = new THREE.Vector3(...m.points[1]);
         const dir    = pEnd.clone().sub(pStart);
         const len2   = dir.length();
         if (len2 < 1e-6) return null;
@@ -659,7 +787,6 @@ function createMarkerObject(m) {
         const grp  = makeArrowGeom(len2, sh2R, he2R, r, g, b, a);
         grp.position.copy(pStart);
         grp.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir);
-        grp.userData.skipPose = true;
         return grp;
       }
       return makeArrowGeom(length, shaftR, headR, r, g, b, a);
@@ -849,6 +976,7 @@ function _removeMarker(key) {
   markerRoot.remove(obj);
   disposeMarker(obj);
   markerObjects.delete(key);
+  markerMessages.delete(key);
 }
 
 function _removeAllMarkers(ns) {
@@ -872,9 +1000,18 @@ function updateMarkerArray(msg) {
     applyMarkerPose(obj, m);
     markerRoot.add(obj);
     markerObjects.set(key, obj);
+    markerMessages.set(key, m);
   }
   const n = markerObjects.size;
   setStatus('markers', `${n} marker${n !== 1 ? 's' : ''}`, 'ok');
+}
+
+function updateMarkerPosesFromTF() {
+  for (const [key, obj] of markerObjects.entries()) {
+    const msg = markerMessages.get(key);
+    if (!msg) continue;
+    applyMarkerPose(obj, msg);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -911,7 +1048,7 @@ function connectWS() {
         break;
 
       case 'tf':
-        applyTF(msg.transforms, msg.static);
+        applyTF(msg.transforms, msg.static, msg.fixed_frame);
         break;
 
       case 'image':
@@ -925,6 +1062,10 @@ function connectWS() {
 
       case 'marker_array':
         updateMarkerArray(msg);
+        break;
+
+      case 'html_panel':
+        updateHtmlPanel(msg.data, msg.topic);
         break;
     }
   };
@@ -946,6 +1087,63 @@ function updateImage(dataUri, topic) {
   imgTopicLabel.textContent = topic.split('/').pop();
   imagePanel.classList.remove('hidden');
   setStatus('image', topic, 'ok');
+}
+
+function isSafeUrl(url) {
+  const value = String(url || '').trim();
+  if (!value) return false;
+  if (value.startsWith('#') || value.startsWith('/') || value.startsWith('./') || value.startsWith('../')) {
+    return true;
+  }
+  try {
+    const parsed = new URL(value, window.location.origin);
+    const allowedProtocols = new Set(['http:', 'https:', 'mailto:', 'tel:']);
+    return allowedProtocols.has(parsed.protocol);
+  } catch {
+    return false;
+  }
+}
+
+const panelSanitizerConfig = {
+  allowElements: ['div', 'p', 'span', 'strong', 'em', 'b', 'i', 'u',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'ul', 'ol', 'li', 'br', 'hr', 'code', 'pre', 'blockquote', 'a'],
+  allowAttributes: {
+    class: ['*'],
+    title: ['*'],
+    role: ['*'],
+    href: ['a'],
+    target: ['a'],
+    rel: ['a'],
+  },
+};
+
+function normalizePanelLinks(root) {
+  for (const link of root.querySelectorAll('a')) {
+    const href = link.getAttribute('href');
+    if (!isSafeUrl(href)) {
+      link.removeAttribute('href');
+      link.removeAttribute('target');
+      link.removeAttribute('rel');
+      continue;
+    }
+    link.setAttribute('target', '_blank');
+    link.setAttribute('rel', 'noopener noreferrer');
+  }
+}
+
+function updateHtmlPanel(html, topic) {
+  const rawHtml = String(html ?? '');
+  if (typeof window.Sanitizer === 'function' && typeof htmlPanelContent.setHTML === 'function') {
+    const sanitizer = new window.Sanitizer(panelSanitizerConfig);
+    htmlPanelContent.setHTML(rawHtml, { sanitizer });
+    normalizePanelLinks(htmlPanelContent);
+  } else {
+    // Degraded fallback for browsers without Sanitizer API support.
+    htmlPanelContent.textContent = rawHtml;
+  }
+  htmlTopicLabel.textContent = topic.split('/').pop();
+  setStatus('html', topic, 'ok');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -990,10 +1188,11 @@ function setWsStatus(connected) {
 }
 
 function setStatus(key, text, state) {
-  // key: 'robot' | 'joints' | 'cloud' | 'image' | 'markers'
+  // key: 'robot' | 'joints' | 'cloud' | 'image' | 'markers' | 'html'
   const map = {
     robot: 'st-robot', joints: 'st-joints',
     cloud: 'st-cloud', image: 'st-image', markers: 'st-markers',
+    html: 'st-html',
   };
   const el = document.getElementById(map[key]);
   if (!el) return;
@@ -1036,11 +1235,12 @@ function animate() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  const { width, height } = getCanvasSize();
+  camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
-  bloomPass.resolution.set(window.innerWidth, window.innerHeight);
+  renderer.setSize(width, height, false);
+  composer.setSize(width, height);
+  bloomPass.resolution.set(width, height);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1059,4 +1259,5 @@ setTimeout(() => {
 
 connectWS();
 fetchURDF();
+window.dispatchEvent(new Event('resize'));
 animate();

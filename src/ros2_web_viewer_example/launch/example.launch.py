@@ -53,6 +53,10 @@ def generate_launch_description():
             'enable_marker_sim', default_value='false',
             description='Launch the simulated MarkerArray publisher'),
 
+        DeclareLaunchArgument(
+            'enable_html_panel_sim', default_value='true',
+            description='Launch the simulated HTML panel String publisher'),
+
         # ── UR3e robot description + joint_state_publisher ───────────────
 
         IncludeLaunchDescription(
@@ -98,6 +102,16 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration('enable_marker_sim')),
         ),
 
+        # ── Simulated dynamic HTML panel ──────────────────────────────────
+
+        Node(
+            package='ros2_web_viewer_example',
+            executable='html_panel_sim',
+            name='html_panel_sim',
+            output='screen',
+            condition=IfCondition(LaunchConfiguration('enable_html_panel_sim')),
+        ),
+
         # ── Web viewer ───────────────────────────────────────────────────
 
         Node(
@@ -113,6 +127,7 @@ def generate_launch_description():
                 'marker_array_topics': ['/markers'],
                 'pointcloud_max_points': 5000,
                 'image_jpeg_quality': 65,
+                'html_panel_topic': '/viewer_panel_html',
             }],
         ),
     ])

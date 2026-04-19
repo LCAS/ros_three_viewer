@@ -1,49 +1,43 @@
 /**:
   ros__parameters:
     # ────────────────────────────────────────────────────────────────────────────
-    # Web server
+    # PhenAIx project-specific parameter overrides
     # ────────────────────────────────────────────────────────────────────────────
-    host: "0.0.0.0"               # Bind address for the HTTP/WebSocket server
-    port: 8080                      # Port for the HTTP/WebSocket server
+    # Base config is in config/params.yaml; overrides below are PhenAIx-specific.
+    
+    # Web server
+    host: "0.0.0.0"
+    port: 8080
 
     # ────────────────────────────────────────────────────────────────────────────
-    # Topics to bridge — adjust to your robot's topic names
+    # Topics — PhenAIx-specific sensor/integration pipeline topics
     # ────────────────────────────────────────────────────────────────────────────
     image_topics:
-      - /camera/image_raw           # sensor_msgs/Image topics to display in viewer
       - /camera/color/image_raw      # RealSense camera RGB image
-      # - /camera/rgb/image_raw
-      # - /realsense/color/image_raw
 
     pointcloud_topics:
-      - /points                     # sensor_msgs/PointCloud2 topics to render
       - /integrated_cloud             # Integrated point cloud from fusion module
-      # - /velodyne_points
-      # - /realsense/depth/color/points
 
     marker_array_topics:
-      - /markers                    # visualization_msgs/MarkerArray topics to render
-      # - /planning_markers
+      # - /planning_markers           # Uncomment if using planning visualizations
+      # - /detection_markers
 
     # ────────────────────────────────────────────────────────────────────────────
     # URDF & TF configuration
     # ────────────────────────────────────────────────────────────────────────────
-    fixed_frame: "base_link"        # TF frame used as world origin (RViz-style)
-    target_frame: "base_link"       # Fallback TF frame (used if fixed_frame not set)
+    fixed_frame: "base_link"
+    target_frame: "base_link"
 
-    html_panel_topic: "/viewer_panel_html"  # std_msgs/String topic for right-side HTML panel
+    html_panel_topic: "/viewer_panel_html"
 
     # ────────────────────────────────────────────────────────────────────────────
-    # URDF link display filtering (whitelist has precedence over blacklist)
-    # When whitelist is non-empty, ONLY those links are displayed.
-    # When whitelist is empty and blacklist is non-empty, those links are hidden.
-    # When both are empty, all links are displayed.
+    # URDF link display filtering
     # ────────────────────────────────────────────────────────────────────────────
-    urdf_link_whitelist: []         # List of URDF link names to display (priority over blacklist)
-    urdf_link_blacklist: []         # List of URDF link names to hide (ignored if whitelist non-empty)
+    urdf_link_whitelist: []         # Leave empty to show all links
+    urdf_link_blacklist: []         # Or specify links to hide
 
     # ────────────────────────────────────────────────────────────────────────────
     # Performance & rendering
     # ────────────────────────────────────────────────────────────────────────────
-    pointcloud_max_points: 8000     # Maximum points per cloud (heavier clouds are downsampled)
-    image_jpeg_quality: 65          # JPEG quality for compressed image bridge (1-100; lower = faster but blurrier)
+    pointcloud_max_points: 8000     # Adjust based on network/GPU performance
+    image_jpeg_quality: 65          # Balance quality/latency for your network

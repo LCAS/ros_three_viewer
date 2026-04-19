@@ -35,6 +35,7 @@ class ViewerServer:
         self._get_urdf = urdf_getter
         self._clients: Set[WebSocket] = set()
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._client_init_messages_getter: Callable[[], list[str]] | None = None
         self.app = self._build_app()
 
     # ------------------------------------------------------------------
@@ -78,6 +79,12 @@ class ViewerServer:
             await websocket.accept()
             self._clients.add(websocket)
             log.info('Client connected (%d total)', len(self._clients))
+            if self._client_init_messages_getter:
+                try:
+                    for message in self._client_init_messages_getter():
+                        await websocket.send_text(message)
+                except Exception:
+                    log.exception('Failed to send cached init messages to client')
             try:
                 while True:
                     # Keep the connection alive; ignore incoming pings
@@ -112,6 +119,10 @@ class ViewerServer:
         """Thread-safe: schedule a broadcast from any thread (e.g. ROS2 callback)."""
         if self._loop and not self._loop.is_closed():
             asyncio.run_coroutine_threadsafe(self._broadcast(message), self._loop)
+
+    def set_client_init_messages_getter(self, getter: Callable[[], list[str]]):
+        """Register callback used to replay cached state to new WS clients."""
+        self._client_init_messages_getter = getter
 
     # ------------------------------------------------------------------
     # Entry point

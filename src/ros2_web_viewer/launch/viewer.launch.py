@@ -1,52 +1,36 @@
-"""Launch file for ros2_web_viewer."""
+"""Launch file for ros2_web_viewer.
 
+Parameter configuration:
+  - All parameters are loaded from a YAML configuration file (config/params.yaml by default).
+  - Optionally, override the config file using the 'params_file' launch argument:
+      ros2 launch ros2_web_viewer viewer.launch.py params_file:=path/to/custom_params.yaml
+"""
+
+import os
+
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.descriptions import ParameterFile
 
 
 def generate_launch_description():
+    pkg_dir = get_package_share_directory('ros2_web_viewer')
+    default_params_file = PathJoinSubstitution([pkg_dir, 'config', 'params.yaml'])
+
     return LaunchDescription([
-
         DeclareLaunchArgument(
-            'host', default_value='0.0.0.0',
-            description='Web server bind address'),
-
-        DeclareLaunchArgument(
-            'port', default_value='8080',
-            description='Web server port'),
-
-        DeclareLaunchArgument(
-            'image_topics',
-            default_value="['/camera/image_raw']",
-            description='List of sensor_msgs/Image topics to bridge'),
-
-        DeclareLaunchArgument(
-            'pointcloud_topics',
-            default_value="['/points']",
-            description='List of sensor_msgs/PointCloud2 topics to bridge'),
-
-        DeclareLaunchArgument(
-            'pointcloud_max_points', default_value='8000',
-            description='Maximum points per cloud (downsampled if exceeded)'),
-
-        DeclareLaunchArgument(
-            'image_jpeg_quality', default_value='65',
-            description='JPEG quality for compressed image bridge (1-100)'),
+            'params_file',
+            default_value=[default_params_file],
+            description='Path to ROS2 parameters YAML file (config/params.yaml by default)'),
 
         Node(
             package='ros2_web_viewer',
             executable='ros2_web_viewer',
             name='ros2_web_viewer',
             output='screen',
-            parameters=[{
-                'host':                   LaunchConfiguration('host'),
-                'port':                   LaunchConfiguration('port'),
-                'image_topics':           LaunchConfiguration('image_topics'),
-                'pointcloud_topics':      LaunchConfiguration('pointcloud_topics'),
-                'pointcloud_max_points':  LaunchConfiguration('pointcloud_max_points'),
-                'image_jpeg_quality':     LaunchConfiguration('image_jpeg_quality'),
-            }],
+            parameters=[ParameterFile(LaunchConfiguration('params_file'), allow_substs=True)],
         ),
     ])

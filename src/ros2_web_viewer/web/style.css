@@ -34,11 +34,45 @@ html, body {
   font-family: var(--sans);
 }
 
+/* ── Main two-pane layout ─────────────────────────────────── */
+#app-layout {
+  position: fixed;
+  top: 52px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 20px;
+  padding: 12px 20px 20px;
+  z-index: 12;
+}
+
+#left-pane {
+  flex: 0 0 auto;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+#viewer-square {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.15);
+}
+
 /* ── Canvas ───────────────────────────────────────────────── */
 #canvas {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   display: block;
 }
 
@@ -54,7 +88,7 @@ html, body {
     url('assets/noise.svg');
   background-size: cover, cover, cover, 300px 300px;
   background-position: center, center, center, 0 0;
-  opacity: 0.12;
+  opacity: 0.20;
   pointer-events: none;
   z-index: 8;
 }
@@ -128,16 +162,75 @@ html, body {
 }
 #ws-dot.connected { background: var(--good); }
 
-/* ── Bottom-left status panel ────────────────────────────── */
-#status-panel {
-  position: fixed;
-  bottom: 20px; left: 20px;
-  width: 240px;
+/* ── Right pane ──────────────────────────────────────────── */
+#right-pane {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#html-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 240px;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 4px;
   backdrop-filter: var(--panel-blur);
-  z-index: 20;
+  overflow: hidden;
+}
+
+#html-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--panel-border);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cream-dim);
+}
+
+#html-panel-content {
+  width: 100%;
+  flex: 1;
+  overflow: auto;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #1f2a18;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+#html-panel-content h1,
+#html-panel-content h2,
+#html-panel-content h3 {
+  margin: 0 0 8px;
+  color: #1f2a18;
+}
+
+#html-panel-content p {
+  margin: 0 0 8px;
+}
+
+#html-panel-content code {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
+/* ── Status panel ────────────────────────────────────────── */
+#status-panel {
+  width: 100%;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  backdrop-filter: var(--panel-blur);
   overflow: hidden;
 }
 
@@ -189,22 +282,19 @@ html, body {
 .status-value.warn { color: var(--warn); }
 .status-value.bad  { color: var(--danger); }
 
-/* ── Right-side image panel ──────────────────────────────── */
+/* ── Image panel ─────────────────────────────────────────── */
 #image-panel {
-  position: fixed;
-  bottom: 20px; right: 20px;
-  width: 320px;
+  width: 100%;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 4px;
   backdrop-filter: var(--panel-blur);
-  z-index: 20;
   overflow: hidden;
-  transition: opacity 0.4s, transform 0.4s;
+  transition: opacity 0.3s ease;
 }
 #image-panel.hidden {
   opacity: 0;
-  transform: translateX(20px);
+  height: 0;
   pointer-events: none;
 }
 
@@ -272,6 +362,44 @@ html, body {
 #corner-br { bottom: 12px; right: 12px; }
 #corner-br::before { bottom: 0; right: 0; }
 #corner-br::after  { bottom: 0; right: 0; }
+
+@media (max-width: 1200px) {
+  #app-layout {
+    gap: 12px;
+    padding: 10px 12px 12px;
+  }
+  #right-pane {
+    min-width: 0;
+  }
+}
+
+@media (orientation: portrait) {
+  #app-layout {
+    flex-direction: column;
+    gap: 10px;
+    padding: 8px 10px 10px;
+    overflow-y: auto;
+  }
+
+  #left-pane {
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+    align-self: stretch;
+  }
+
+  #viewer-square {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+  }
+
+  #right-pane {
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+}
 
 /* ── Loading overlay ─────────────────────────────────────── */
 #loading {

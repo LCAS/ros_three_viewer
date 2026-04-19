@@ -62,7 +62,7 @@ class MarkerSimNode(Node):
 
     def __init__(self):
         super().__init__('marker_sim')
-        self.declare_parameter('frame_id', 'base_link')
+        self.declare_parameter('frame_id', 'tool0')
         self.declare_parameter('publish_rate', 10.0)
 
         self._pub = self.create_publisher(MarkerArray, '/markers', 5)

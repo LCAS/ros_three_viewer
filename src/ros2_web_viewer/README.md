@@ -66,7 +66,7 @@ Then open **http://localhost:8080** in a browser.
 | `/tf` | `tf2_msgs/TFMessage` | |
 | `/tf_static` | `tf2_msgs/TFMessage` | latching QoS |
 | `<data-topic attributes in HTML panel widgets>` | `std_msgs/String` | topics registered dynamically by frontend |
-| `<data-image-topics attributes in 3D widgets>` | `sensor_msgs/Image` | topics registered dynamically by frontend |
+| `<data-topic attributes in image-panel widgets>` | `sensor_msgs/Image` | topics registered dynamically by frontend |
 | `<data-pointcloud-topics attributes in 3D widgets>` | `sensor_msgs/PointCloud2` | topics registered dynamically by frontend |
 | `<data-marker-topics attributes in 3D widgets>` | `visualization_msgs/MarkerArray` | topics registered dynamically by frontend |
 
@@ -105,6 +105,8 @@ For a complete, well-documented list of all parameters with explanations, see [c
 
 `data-ros-widget="html-panel"` widgets register their `data-topic` dynamically via `/api/register_html_panel_topic`. The content is sanitized with the browser Sanitizer API when available (with a safe plain-text fallback).
 
+`data-ros-widget="image-panel"` widgets use `data-topic` for image subscriptions and are registered via `POST /api/register_viewer_topics`.
+
 Buttons using `<button data-trigger-service="/my_service">` call `std_srvs/Trigger` through `POST /api/trigger`.
 
 ## Quick Test (without a real robot)
@@ -133,7 +135,7 @@ ros2 topic pub /viewer_panel_html std_msgs/String \
 - **Dynamic backend topic subscriptions** — configure canvas topic attributes and the frontend registers them via `POST /api/register_viewer_topics`
   - point cloud: `data-pointcloud-topics` (or `data-topic-pointcloud`)
   - markers: `data-marker-array-topics` / `data-marker-topics`
-  - image: `data-image-topics`
+  - image: `data-ros-widget="image-panel"` + `data-topic="/camera/..."`
 - **Extra pages** — configure `html_routes` in params to map custom routes to HTML files in `web/`
 - **Trigger buttons** — add `<button data-trigger-service="/my/service">` to panel HTML
 - **Colours / theme** — edit CSS variables in `web/style.css` (`:root` block)

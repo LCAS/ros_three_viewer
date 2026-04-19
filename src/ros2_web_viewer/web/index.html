@@ -29,7 +29,6 @@
           data-display="urdf pointcloud markers"
           data-pointcloud-topics="/points /integrated_cloud"
           data-marker-topics="/markers"
-          data-image-topics="/camera/image_raw /camera/color/image_raw"
           data-camera-position="2.0 1.6 2.0"
           data-camera-look-at="0 0.5 0"
           data-controls-target="0 0.4 0"
@@ -85,13 +84,13 @@
       </div>
 
       <!-- ── Camera image panel ───────────────────────────── -->
-      <div id="image-panel" class="hidden">
+      <div id="image-panel" class="hidden" data-ros-widget="image-panel" data-topic="/camera/color/image_raw">
         <div id="image-header">
           <span>&#x25CF;&nbsp;SENSOR FEED</span>
-          <span id="image-topic-label">—</span>
+          <span id="image-topic-label" data-role="image-topic-label">—</span>
         </div>
         <img id="camera-image" alt="camera feed" style="display:none" />
-        <div id="image-placeholder">NO SIGNAL</div>
+        <div id="image-placeholder" data-role="image-placeholder">NO SIGNAL</div>
       </div>
     </div>
   </div>

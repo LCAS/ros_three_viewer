@@ -86,10 +86,10 @@
     <div class="status-row"><span class="status-label">FPS</span><span class="status-value" id="st-fps">—</span></div>
   </div>
 
-  <div id="image-panel" class="hidden" style="display:none;">
-    <div id="image-header"><span>SENSOR FEED</span><span id="image-topic-label">—</span></div>
+  <div id="image-panel" class="hidden" data-ros-widget="image-panel" data-topic="/camera/color/image_raw" style="display:none;">
+    <div id="image-header"><span>SENSOR FEED</span><span id="image-topic-label" data-role="image-topic-label">—</span></div>
     <img id="camera-image" alt="camera feed" style="display:none" />
-    <div id="image-placeholder">NO SIGNAL</div>
+    <div id="image-placeholder" data-role="image-placeholder">NO SIGNAL</div>
   </div>
 
   <div id="loading" style="display:none;"></div>

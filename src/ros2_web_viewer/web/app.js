@@ -175,11 +175,6 @@ function parse3DTopicConfig(el, displayConfig) {
         DEFAULT_VIEWER_TOPICS.marker_array,
       )
       : [],
-    imageTopics: parseTopicListFromAttrs(
-      el,
-      ['data-image-topics', 'data-topic-image'],
-      [],
-    ),
   };
 }
 
@@ -311,9 +306,6 @@ const activePointCloudTopics = new Set(
 );
 const activeMarkerArrayTopics = new Set(
   viewerWidgets.flatMap((widget) => widget.topicConfig.markerArrayTopics),
-);
-const activeImageTopics = new Set(
-  viewerWidgets.flatMap((widget) => widget.topicConfig.imageTopics),
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1354,10 +1346,28 @@ function connectWS() {
 // Camera image panel
 // ─────────────────────────────────────────────────────────────────────────────
 
-const imagePanel       = document.getElementById('image-panel');
-const cameraImg        = document.getElementById('camera-image');
-const imgPlaceholder   = document.getElementById('image-placeholder');
-const imgTopicLabel    = document.getElementById('image-topic-label');
+const imagePanelWidgets = Array.from(document.querySelectorAll('[data-ros-widget="image-panel"]'))
+  .map((panel) => {
+    const imageEl = panel.querySelector('img');
+    const placeholderEl = panel.querySelector('#image-placeholder, [data-role="image-placeholder"]');
+    const topicEl = panel.querySelector('#image-topic-label, [data-role="image-topic-label"]');
+    if (!imageEl || !placeholderEl || !topicEl) return null;
+    return {
+      panel,
+      imageEl,
+      placeholderEl,
+      topicEl,
+      topicFilter: String(panel.getAttribute('data-topic') || '').trim(),
+    };
+  })
+  .filter(Boolean);
+
+const activeImageTopics = new Set(
+  imagePanelWidgets
+    .map((widget) => widget.topicFilter)
+    .filter((topic) => topic && topic.startsWith('/')),
+);
+
 const htmlPanelWidgets = Array.from(document.querySelectorAll('[data-ros-widget="html-panel"]'))
   .map((panel) => {
     const contentEl = panel.querySelector('[data-role="html-content"]');
@@ -1373,15 +1383,19 @@ const htmlPanelWidgets = Array.from(document.querySelectorAll('[data-ros-widget=
   .filter(Boolean);
 
 function updateImage(dataUri, topic) {
-  if (!imagePanel || !cameraImg || !imgPlaceholder || !imgTopicLabel) {
-    return;
+  let didUpdate = false;
+  for (const widget of imagePanelWidgets) {
+    if (widget.topicFilter && widget.topicFilter !== topic) continue;
+    widget.imageEl.src = dataUri;
+    widget.imageEl.style.display = 'block';
+    widget.placeholderEl.style.display = 'none';
+    widget.topicEl.textContent = topic.split('/').pop();
+    widget.panel.classList.remove('hidden');
+    didUpdate = true;
   }
-  cameraImg.src = dataUri;
-  cameraImg.style.display = 'block';
-  imgPlaceholder.style.display = 'none';
-  imgTopicLabel.textContent = topic.split('/').pop();
-  imagePanel.classList.remove('hidden');
-  setStatus('image', topic, 'ok');
+  if (didUpdate) {
+    setStatus('image', topic, 'ok');
+  }
 }
 
 function isSafeUrl(url) {

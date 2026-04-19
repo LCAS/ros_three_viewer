@@ -31,10 +31,10 @@ import base64
 import ast
 import json
 import logging
-import math
 import os
 import re
 import threading
+import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -65,6 +65,7 @@ _LATCHING_QOS = QoSProfile(
 )
 _TRIGGER_TIMEOUT_MIN = 0.1
 _TRIGGER_TIMEOUT_MAX = 30.0
+_SENSOR_THROTTLE_CHECK_PERIOD_SEC = 0.1
 
 
 # ---------------------------------------------------------------------------
@@ -116,12 +117,20 @@ class WebViewerNode(Node):
         self._tf_cache_lock = threading.Lock()
         self._tf_static_cache: dict[str, dict] = {}
         self._tf_dynamic_cache: dict[str, dict] = {}
+        self._joint_state_cache_lock = threading.Lock()
+        self._joint_state_latest_payload: dict | None = None
         self._marker_cache_lock = threading.Lock()
         self._marker_cache_by_topic: dict[str, dict[str, dict]] = {}
         self._html_panel_cache_lock = threading.Lock()
         self._html_panel_cache_by_topic: dict[str, str] = {}
+        self._image_cache_lock = threading.Lock()
+        self._image_latest_by_topic: dict[str, Image] = {}
+        self._image_last_sent_monotonic_by_topic: dict[str, float] = {}
         self._image_subscriptions_lock = threading.Lock()
         self._image_subscriptions: dict[str, object] = {}
+        self._pointcloud_cache_lock = threading.Lock()
+        self._pointcloud_latest_by_topic: dict[str, PointCloud2] = {}
+        self._pointcloud_last_sent_monotonic_by_topic: dict[str, float] = {}
         self._pointcloud_subscriptions_lock = threading.Lock()
         self._pointcloud_subscriptions: dict[str, object] = {}
         self._marker_array_subscriptions_lock = threading.Lock()
@@ -134,6 +143,12 @@ class WebViewerNode(Node):
         # ── Parameters ──────────────────────────────────────────────────
         self.declare_parameter('pointcloud_max_points', 8000)
         self.declare_parameter('image_jpeg_quality', 65)
+        self.declare_parameter('joint_states_broadcast_hz', 1.0)
+        self.declare_parameter('tf_broadcast_hz', 1.0)
+        self.declare_parameter('image_broadcast_hz', 1.0)
+        self.declare_parameter('pointcloud_broadcast_hz', 1.0)
+        self.declare_parameter('image_topic_broadcast_hz', '{}')
+        self.declare_parameter('pointcloud_topic_broadcast_hz', '{}')
         self.declare_parameter('html_routes', '{}')
         self.declare_parameter('fixed_frame', 'base_link')
         self.declare_parameter('target_frame', 'base_link')
@@ -142,11 +157,38 @@ class WebViewerNode(Node):
         self._urdf_link_whitelist = self._resolve_string_list_parameter('urdf_link_whitelist')
         self._urdf_link_blacklist = self._resolve_string_list_parameter('urdf_link_blacklist')
         self._fixed_frame = self._resolve_fixed_frame()
+        self._joint_states_broadcast_hz = self._resolve_positive_float_parameter('joint_states_broadcast_hz', 1.0)
+        self._tf_broadcast_hz = self._resolve_positive_float_parameter('tf_broadcast_hz', 1.0)
+        self._image_broadcast_hz = self._resolve_positive_float_parameter('image_broadcast_hz', 1.0)
+        self._pointcloud_broadcast_hz = self._resolve_positive_float_parameter('pointcloud_broadcast_hz', 1.0)
+        self._image_topic_broadcast_hz = self._resolve_topic_rate_map_parameter('image_topic_broadcast_hz')
+        self._pointcloud_topic_broadcast_hz = self._resolve_topic_rate_map_parameter('pointcloud_topic_broadcast_hz')
         self._server.set_client_init_messages_getter(self._get_ws_init_messages)
         self._server.set_trigger_service_caller(self._call_trigger_service)
         self._server.set_viewer_topic_registrar(self.register_viewer_topics)
         self._server.set_html_panel_topic_registrar(self.register_html_panel_topic)
         self._server.set_html_routes(self._resolve_html_routes_parameter('html_routes'))
+
+        self._joint_states_flush_timer = None
+        self._tf_flush_timer = None
+        if self._joint_states_broadcast_hz > 0.0:
+            self._joint_states_flush_timer = self.create_timer(
+                1.0 / self._joint_states_broadcast_hz,
+                self._flush_joint_states,
+            )
+        if self._tf_broadcast_hz > 0.0:
+            self._tf_flush_timer = self.create_timer(
+                1.0 / self._tf_broadcast_hz,
+                self._flush_dynamic_tf,
+            )
+        self._image_flush_timer = self.create_timer(
+            _SENSOR_THROTTLE_CHECK_PERIOD_SEC,
+            self._flush_images,
+        )
+        self._pointcloud_flush_timer = self.create_timer(
+            _SENSOR_THROTTLE_CHECK_PERIOD_SEC,
+            self._flush_pointclouds,
+        )
 
         # ── Core subscriptions ───────────────────────────────────────────
         self.create_subscription(
@@ -165,6 +207,16 @@ class WebViewerNode(Node):
 
         self.get_logger().info('ros2_web_viewer node initialised')
         self.get_logger().info(f'Using fixed frame: {self._fixed_frame}')
+        self.get_logger().info(
+            f'Throttle rates (Hz): joint_states={self._joint_states_broadcast_hz}, '
+            f'tf={self._tf_broadcast_hz}, image={self._image_broadcast_hz}, '
+            f'pointcloud={self._pointcloud_broadcast_hz}')
+        if self._image_topic_broadcast_hz:
+            self.get_logger().info(
+                f'Image topic-specific throttle overrides (Hz): {self._image_topic_broadcast_hz}')
+        if self._pointcloud_topic_broadcast_hz:
+            self.get_logger().info(
+                f'Point cloud topic-specific throttle overrides (Hz): {self._pointcloud_topic_broadcast_hz}')
         if self._urdf_link_whitelist:
             if self._urdf_link_blacklist:
                 self.get_logger().info(
@@ -217,6 +269,71 @@ class WebViewerNode(Node):
             seen.add(item)
             deduped.append(item)
         return deduped
+
+    def _resolve_positive_float_parameter(self, name: str, default: float) -> float:
+        """Return parameter as float. Non-positive values disable throttling."""
+        try:
+            raw = self.get_parameter(name).value
+        except rclpy.exceptions.ParameterUninitializedException:
+            return float(default)
+
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            self.get_logger().warning(
+                f'Invalid value for parameter "{name}": {raw!r}. Using default {default}.')
+            return float(default)
+        return value
+
+    def _resolve_topic_rate_map_parameter(self, name: str) -> dict[str, float]:
+        """Resolve mapping topic->Hz from dict/JSON/python-literal parameter."""
+        try:
+            raw = self.get_parameter(name).value
+        except rclpy.exceptions.ParameterUninitializedException:
+            return {}
+
+        parsed: dict | None = None
+        if isinstance(raw, dict):
+            parsed = raw
+        elif isinstance(raw, str):
+            raw_str = raw.strip()
+            if not raw_str:
+                return {}
+            try:
+                candidate = json.loads(raw_str)
+                if isinstance(candidate, dict):
+                    parsed = candidate
+            except json.JSONDecodeError:
+                try:
+                    candidate = ast.literal_eval(raw_str)
+                    if isinstance(candidate, dict):
+                        parsed = candidate
+                except (ValueError, SyntaxError):
+                    parsed = None
+
+        if parsed is None:
+            self.get_logger().warning(
+                f'Invalid topic rate map in parameter "{name}": {raw!r}. Ignoring overrides.')
+            return {}
+
+        rates: dict[str, float] = {}
+        for topic, value in parsed.items():
+            topic_name = str(topic or '').strip()
+            if not topic_name or not self._is_valid_topic_name(topic_name):
+                continue
+            try:
+                rates[topic_name] = float(value)
+            except (TypeError, ValueError):
+                continue
+        return rates
+
+    @staticmethod
+    def _is_due(now: float, last_sent: float | None, hz: float) -> bool:
+        if hz <= 0.0:
+            return True
+        if last_sent is None:
+            return True
+        return (now - last_sent) >= (1.0 / hz)
 
     def _resolve_html_routes_parameter(self, name: str) -> dict[str, str]:
         """Return route->path mapping from a dictionary-like parameter value."""
@@ -534,6 +651,17 @@ class WebViewerNode(Node):
             'position': [float(v) for v in msg.position],
             'velocity': [float(v) for v in (msg.velocity or [])],
         }
+        with self._joint_state_cache_lock:
+            self._joint_state_latest_payload = payload
+
+        if self._joint_states_broadcast_hz <= 0.0:
+            self._server.broadcast_threadsafe(json.dumps(payload))
+
+    def _flush_joint_states(self):
+        with self._joint_state_cache_lock:
+            payload = self._joint_state_latest_payload
+        if payload is None:
+            return
         self._server.broadcast_threadsafe(json.dumps(payload))
 
     def _on_tf(self, msg: TFMessage, static: bool):
@@ -554,13 +682,27 @@ class WebViewerNode(Node):
                     child = str(tf.get('child', '') or '').strip()
                     if child:
                         cache[child] = tf
-            payload = {
-                'type': 'tf',
-                'static': static,
-                'fixed_frame': self._fixed_frame,
-                'transforms': transforms,
-            }
-            self._server.broadcast_threadsafe(json.dumps(payload))
+            if static or self._tf_broadcast_hz <= 0.0:
+                payload = {
+                    'type': 'tf',
+                    'static': static,
+                    'fixed_frame': self._fixed_frame,
+                    'transforms': transforms,
+                }
+                self._server.broadcast_threadsafe(json.dumps(payload))
+
+    def _flush_dynamic_tf(self):
+        with self._tf_cache_lock:
+            dynamic_transforms = list(self._tf_dynamic_cache.values())
+        if not dynamic_transforms:
+            return
+        payload = {
+            'type': 'tf',
+            'static': False,
+            'fixed_frame': self._fixed_frame,
+            'transforms': dynamic_transforms,
+        }
+        self._server.broadcast_threadsafe(json.dumps(payload))
 
     def _get_ws_init_messages(self) -> list[str]:
         """Return cached state that new websocket clients need immediately."""
@@ -568,6 +710,8 @@ class WebViewerNode(Node):
         with self._tf_cache_lock:
             static_transforms = list(self._tf_static_cache.values())
             dynamic_transforms = list(self._tf_dynamic_cache.values())
+        with self._joint_state_cache_lock:
+            joint_states = dict(self._joint_state_latest_payload) if self._joint_state_latest_payload else None
         with self._marker_cache_lock:
             marker_snapshots = {
                 topic: list(marker_map.values())
@@ -593,6 +737,9 @@ class WebViewerNode(Node):
                 'transforms': dynamic_transforms,
             }))
 
+        if joint_states:
+            messages.append(json.dumps(joint_states))
+
         for topic, markers in marker_snapshots.items():
             messages.append(json.dumps({
                 'type': 'marker_array',
@@ -610,9 +757,33 @@ class WebViewerNode(Node):
         return messages
 
     def _on_image(self, msg: Image, topic: str):
+        effective_hz = self._image_topic_broadcast_hz.get(topic, self._image_broadcast_hz)
+        if effective_hz <= 0.0:
+            self._broadcast_image_message(msg, topic)
+            return
+
+        with self._image_cache_lock:
+            self._image_latest_by_topic[topic] = msg
+
+    def _flush_images(self):
+        now_monotonic = time.monotonic()
+        due_messages: list[tuple[str, Image]] = []
+        with self._image_cache_lock:
+            for topic, msg in list(self._image_latest_by_topic.items()):
+                hz = self._image_topic_broadcast_hz.get(topic, self._image_broadcast_hz)
+                last_sent = self._image_last_sent_monotonic_by_topic.get(topic)
+                if not self._is_due(now_monotonic, last_sent, hz):
+                    continue
+                due_messages.append((topic, msg))
+                self._image_last_sent_monotonic_by_topic[topic] = now_monotonic
+                self._image_latest_by_topic.pop(topic, None)
+
+        for topic, msg in due_messages:
+            self._broadcast_image_message(msg, topic)
+
+    def _broadcast_image_message(self, msg: Image, topic: str):
         try:
             import cv2
-            import numpy as np
             from cv_bridge import CvBridge
             quality = self.get_parameter('image_jpeg_quality').value
             bridge = CvBridge()
@@ -634,6 +805,31 @@ class WebViewerNode(Node):
                                       throttle_duration_sec=5.0)
 
     def _on_pointcloud(self, msg: PointCloud2, topic: str):
+        effective_hz = self._pointcloud_topic_broadcast_hz.get(topic, self._pointcloud_broadcast_hz)
+        if effective_hz <= 0.0:
+            self._broadcast_pointcloud_message(msg, topic)
+            return
+
+        with self._pointcloud_cache_lock:
+            self._pointcloud_latest_by_topic[topic] = msg
+
+    def _flush_pointclouds(self):
+        now_monotonic = time.monotonic()
+        due_messages: list[tuple[str, PointCloud2]] = []
+        with self._pointcloud_cache_lock:
+            for topic, msg in list(self._pointcloud_latest_by_topic.items()):
+                hz = self._pointcloud_topic_broadcast_hz.get(topic, self._pointcloud_broadcast_hz)
+                last_sent = self._pointcloud_last_sent_monotonic_by_topic.get(topic)
+                if not self._is_due(now_monotonic, last_sent, hz):
+                    continue
+                due_messages.append((topic, msg))
+                self._pointcloud_last_sent_monotonic_by_topic[topic] = now_monotonic
+                self._pointcloud_latest_by_topic.pop(topic, None)
+
+        for topic, msg in due_messages:
+            self._broadcast_pointcloud_message(msg, topic)
+
+    def _broadcast_pointcloud_message(self, msg: PointCloud2, topic: str):
         try:
             max_pts = self.get_parameter('pointcloud_max_points').value
             packed = decode_pointcloud2(msg, max_pts)

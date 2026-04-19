@@ -24,7 +24,7 @@
     #urdf_link_blacklist: []         # List of URDF link names to hide (ignored if whitelist non-empty)
     urdf_link_whitelist:
       - "shoulder_link"
-      - "upper_arm_link"
+      #- "upper_arm_link"
       - "forearm_link"
       - "wrist_1_link"
       - "wrist_2_link"
@@ -40,5 +40,11 @@
     # ────────────────────────────────────────────────────────────────────────────
     # Performance & rendering
     # ────────────────────────────────────────────────────────────────────────────
+    joint_states_broadcast_hz: 1.0  # Joint state websocket broadcast rate (<=0 disables throttling)
+    tf_broadcast_hz: 1.0            # Dynamic TF websocket broadcast rate (<=0 disables throttling)
+    image_broadcast_hz: 1.0         # Default image topic websocket broadcast rate (<=0 disables throttling)
+    pointcloud_broadcast_hz: 1.0    # Default point cloud topic websocket broadcast rate (<=0 disables throttling)
+    image_topic_broadcast_hz: "{}"       # Optional per-topic image rates as JSON/Python dict, e.g. {'/cam/front': 2.0}
+    pointcloud_topic_broadcast_hz: "{}"  # Optional per-topic point cloud rates as JSON/Python dict, e.g. {'/points': 0.5}
     pointcloud_max_points: 8000     # Maximum points per cloud (heavier clouds are downsampled)
     image_jpeg_quality: 65          # JPEG quality for compressed image bridge (1-100; lower = faster but blurrier)

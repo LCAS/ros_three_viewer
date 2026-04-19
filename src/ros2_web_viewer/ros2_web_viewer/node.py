@@ -61,6 +61,8 @@ _LATCHING_QOS = QoSProfile(
     reliability=QoSReliabilityPolicy.RELIABLE,
     durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
 )
+_TRIGGER_TIMEOUT_MIN = 0.1
+_TRIGGER_TIMEOUT_MAX = 30.0
 
 
 # ---------------------------------------------------------------------------
@@ -346,10 +348,10 @@ class WebViewerNode(Node):
 
     def _call_trigger_service(self, service_name: str, timeout_sec: float) -> dict:
         service = str(service_name or '').strip()
-        timeout = max(0.1, min(float(timeout_sec or 2.0), 30.0))
+        timeout = max(_TRIGGER_TIMEOUT_MIN, min(float(timeout_sec or 2.0), _TRIGGER_TIMEOUT_MAX))
         if not service:
             return {'ok': False, 'error': 'Missing service name'}
-        if not re.fullmatch(r'/[A-Za-z0-9_/]*[A-Za-z0-9_]', service):
+        if not re.fullmatch(r'/([A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*)', service):
             return {'ok': False, 'error': f'Invalid service name "{service}"'}
 
         with self._trigger_clients_lock:

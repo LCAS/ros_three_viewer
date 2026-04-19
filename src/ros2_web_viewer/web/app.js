@@ -27,6 +27,9 @@ const MAX_CLOUD_PTS = 60_000;
 const URDF_RETRY_MS = 2_000;
 const WS_RETRY_MS   = 3_000;
 const WS_URL        = `ws://${location.host}/ws`;
+const TRIGGER_TIMEOUT_DEFAULT = 2.0;
+const TRIGGER_TIMEOUT_MIN = 0.1;
+const TRIGGER_TIMEOUT_MAX = 30.0;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Widget discovery
@@ -34,7 +37,7 @@ const WS_URL        = `ws://${location.host}/ws`;
 
 const threeCanvases = Array.from(document.querySelectorAll('[data-ros-widget="3d"]'));
 if (threeCanvases.length === 0) {
-  throw new Error('No 3D canvas found. Add an element with data-ros-widget="3d".');
+  throw new Error('No 3D canvas found. Add a canvas with data-ros-widget="3d".');
 }
 
 function getCanvasSize(canvasEl) {
@@ -1157,8 +1160,12 @@ function bindTriggerButtons(root) {
       const service = String(button.getAttribute('data-trigger-service') || '').trim();
       if (!service) return;
 
-      const timeoutRaw = Number.parseFloat(button.getAttribute('data-trigger-timeout') || '2.0');
-      const timeoutSec = Number.isFinite(timeoutRaw) && timeoutRaw > 0 ? timeoutRaw : 2.0;
+      const timeoutRaw = Number.parseFloat(
+        button.getAttribute('data-trigger-timeout') || String(TRIGGER_TIMEOUT_DEFAULT),
+      );
+      const timeoutSec = Number.isFinite(timeoutRaw)
+        ? Math.min(Math.max(timeoutRaw, TRIGGER_TIMEOUT_MIN), TRIGGER_TIMEOUT_MAX)
+        : TRIGGER_TIMEOUT_DEFAULT;
 
       button.disabled = true;
       button.dataset.triggerState = 'pending';
@@ -1171,8 +1178,10 @@ function bindTriggerButtons(root) {
         const payload = await response.json();
         const ok = Boolean(payload?.ok);
         button.dataset.triggerState = ok ? 'ok' : 'error';
+        // Prefer backend error text, then service message, then generic fallback.
+        const failureMessage = payload?.error || payload?.message || 'Trigger service call failed';
         button.title = ok ? String(payload.message || 'Trigger service call succeeded')
-          : String(payload.error || payload.message || 'Trigger service call failed');
+          : String(failureMessage);
       } catch (err) {
         button.dataset.triggerState = 'error';
         button.title = `Trigger service call failed: ${err?.message || err}`;

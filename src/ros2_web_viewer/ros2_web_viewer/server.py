@@ -125,10 +125,17 @@ class ViewerServer:
                 self._clients.discard(websocket)
                 log.info('Client disconnected (%d remaining)', len(self._clients))
 
+        def _create_html_route_handler(request_path: str):
+            async def static_html_page():
+                return FileResponse(request_path, media_type='text/html')
+            return static_html_page
+
         for route_path, file_path in self._resolve_static_html_routes().items():
-            async def static_html_page(_request_path: str = file_path):
-                return FileResponse(_request_path, media_type='text/html')
-            app.add_api_route(route_path, static_html_page, methods=['GET'])
+            app.add_api_route(
+                route_path,
+                _create_html_route_handler(file_path),
+                methods=['GET'],
+            )
 
         # Static files last (catches everything else)
         app.mount('/', StaticFiles(directory=self.web_dir, html=True), name='static')
@@ -156,7 +163,7 @@ class ViewerServer:
             else:
                 resolved_file = (web_root / candidate).resolve()
 
-            if web_root not in resolved_file.parents and resolved_file != web_root:
+            if web_root not in resolved_file.parents and resolved_file.parent != web_root:
                 log.warning(
                     'Skipping html route "%s": path "%s" is outside web root "%s"',
                     route_str, path_str, web_root)

@@ -109,6 +109,101 @@ For a complete, well-documented list of all parameters with explanations, see [c
 
 Buttons using `<button data-trigger-service="/my_service">` call `std_srvs/Trigger` through `POST /api/trigger`.
 
+## Frontend Widget Attributes
+
+The frontend discovers widgets and behavior from HTML `data-*` attributes.
+
+### 3D Canvas (`data-ros-widget="3d"`)
+
+Required:
+- `data-ros-widget="3d"`
+
+Display selection:
+- `data-display="..."`
+  - Tokens: `urdf|robot`, `pointcloud|point_cloud|cloud|pc`, `markers|marker`, plus `all` and `none`
+  - Separators: whitespace or commas
+  - Default when omitted: `urdf pointcloud markers`
+- `data-show-urdf="true|false"`
+- `data-show-pointcloud="true|false"`
+- `data-show-markers="true|false"`
+  - These booleans override `data-display` per feature.
+
+Topic attributes (dynamic backend registration):
+- Point cloud topics (first non-empty attribute wins):
+  - `data-pointcloud-topics`
+  - `data-topic-pointcloud`
+  - `data-topic-cloud`
+  - Format: whitespace/comma-separated absolute topic names (must start with `/`)
+  - Default if pointcloud display is enabled and no attribute is provided: `/points`
+- MarkerArray topics (first non-empty attribute wins):
+  - `data-marker-array-topics`
+  - `data-marker-topics`
+  - `data-topic-markers`
+  - `data-topic-marker`
+  - Format: whitespace/comma-separated absolute topic names (must start with `/`)
+  - Default if marker display is enabled and no attribute is provided: `/markers`
+
+URDF link filtering:
+- `data-urdf-link-whitelist="link1 link2 ..."`
+- `data-urdf-link-blacklist="link1 link2 ..."`
+  - If whitelist is set, blacklist is ignored.
+  - Filtering only affects visual creation; link/joint transform hierarchy is preserved.
+
+Camera tuning:
+- `data-camera-fov` (default: `55`)
+- `data-camera-near` (default: `0.001`)
+- `data-camera-far` (default: `60`)
+- `data-camera-position="x y z"` (default: `2.0 1.6 2.0`)
+- `data-camera-look-at="x y z"` (default: `0 0.5 0`)
+
+Orbit controls tuning:
+- `data-controls-target="x y z"` (default: `0 0.4 0`)
+- `data-controls-enable-damping="true|false"` (default: `true`)
+- `data-controls-damping-factor` (default: `0.06`)
+- `data-controls-min-distance` (default: `0.1`)
+- `data-controls-max-distance` (default: `20`)
+- `data-controls-auto-rotate="true|false"` (default: `true`)
+- `data-controls-auto-rotate-speed` (default: `0.75`)
+
+Rendering throttle:
+- `data-fps-throttle`
+  - Per-canvas render cap in Hz (minimum effective value: `1`)
+  - Default: `5`
+
+### HTML Panel (`data-ros-widget="html-panel"`)
+
+Required:
+- `data-ros-widget="html-panel"`
+- `data-topic="/some_html_topic"` (published as `std_msgs/String`)
+
+Expected internal role hooks:
+- `[data-role="html-content"]` (panel content container)
+- `[data-role="html-topic-label"]` (topic label element)
+
+Behavior notes:
+- HTML panel topics are registered dynamically via `POST /api/register_html_panel_topic`.
+- Incoming HTML is sanitized with the browser Sanitizer API when available; otherwise plain text is shown.
+
+### Image Panel (`data-ros-widget="image-panel"`)
+
+Required:
+- `data-ros-widget="image-panel"`
+- `data-topic="/camera/..."` (image topic)
+
+Expected internal role hooks:
+- `[data-role="image-placeholder"]`
+- `[data-role="image-topic-label"]`
+
+Implementation note:
+- For compatibility with older markup, the frontend also accepts legacy IDs (`#image-placeholder`, `#image-topic-label`).
+
+### Trigger Buttons Inside HTML Panels
+
+- `data-trigger-service="/my/service"` (required)
+- `data-trigger-timeout="seconds"` (optional)
+  - Default: `2.0`
+  - Clamped range: `0.1` to `30.0`
+
 ## Quick Test (without a real robot)
 
 ```bash
@@ -132,9 +227,10 @@ ros2 topic pub /viewer_panel_html std_msgs/String \
 - **Widget composition** — use `data-ros-widget="3d"` canvases and `data-ros-widget="html-panel"` containers in your HTML
 - **Per-canvas data selection** — control each 3D canvas with `data-display="urdf pointcloud markers"` (tokens: `urdf|robot`, `pointcloud|cloud|pc`, `markers|marker`, plus `all`/`none`)
 - **Display overrides** — use `data-show-urdf`, `data-show-pointcloud`, `data-show-markers` (boolean) to override `data-display`
+- **Camera and controls tuning** — use canvas attributes such as `data-camera-*`, `data-controls-*`, and `data-fps-throttle`
 - **Dynamic backend topic subscriptions** — configure canvas topic attributes and the frontend registers them via `POST /api/register_viewer_topics`
-  - point cloud: `data-pointcloud-topics` (or `data-topic-pointcloud`)
-  - markers: `data-marker-array-topics` / `data-marker-topics`
+  - point cloud: `data-pointcloud-topics` / `data-topic-pointcloud` / `data-topic-cloud`
+  - markers: `data-marker-array-topics` / `data-marker-topics` / `data-topic-markers` / `data-topic-marker`
   - image: `data-ros-widget="image-panel"` + `data-topic="/camera/..."`
 - **Extra pages** — configure `html_routes` in params to map custom routes to HTML files in `web/` or package-resolved paths (for example, `@ros2_web_viewer_example@/web/examples/modular.html`)
 - **Route-relative assets** — files co-located with a routed HTML file are served under that route prefix (for example, `/modular/style.css` for `/modular`)

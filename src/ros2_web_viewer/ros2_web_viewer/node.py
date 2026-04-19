@@ -385,7 +385,7 @@ class WebViewerNode(Node):
         topic = str(topic_name or '').strip()
         if not topic:
             return {'ok': False, 'error': 'Missing topic name'}
-        if not re.fullmatch(r'/([A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*)', topic):
+        if not re.fullmatch(r'/([-A-Za-z0-9_]+(/[-A-Za-z0-9_]+)*)', topic):
             return {'ok': False, 'error': 'Invalid topic name'}
 
         with self._html_panel_subscriptions_lock:

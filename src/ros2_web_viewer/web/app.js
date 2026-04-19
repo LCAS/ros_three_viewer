@@ -1132,7 +1132,6 @@ const htmlPanelWidgets = Array.from(document.querySelectorAll('[data-ros-widget=
 
 function updateImage(dataUri, topic) {
   if (!imagePanel || !cameraImg || !imgPlaceholder || !imgTopicLabel) {
-    setStatus('image', topic, 'ok');
     return;
   }
   cameraImg.src = dataUri;

@@ -27,7 +27,7 @@ const MAX_CLOUD_PTS = 60_000;
 const URDF_RETRY_MS = 2_000;
 const WS_RETRY_MS   = 3_000;
 const WS_URL        = `ws://${location.host}/ws`;
-const DEFAULT_FPS_THROTTLE_HZ = 5;
+const DEFAULT_FPS_THROTTLE_HZ = 25;
 const TRIGGER_TIMEOUT_DEFAULT = 2.0;
 const TRIGGER_TIMEOUT_MIN = 0.1;
 const TRIGGER_TIMEOUT_MAX = 30.0;
@@ -416,36 +416,42 @@ function createPointCloudMaterial() {
     vertexShader: /* glsl */`
       attribute vec3 aColor;
       varying   vec3 vColor;
+      varying   float vDepth;
       uniform   float uSize;
 
       void main() {
         vColor = aColor;
         vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-        gl_PointSize = uSize * (40.0 / -mvPos.z);
-        gl_Position  = projectionMatrix * mvPos;
+        // Constant point size for accurate geometry visualization
+        gl_PointSize = uSize * (8.0 / -mvPos.z);
+        vDepth = -mvPos.z;
+        gl_Position = projectionMatrix * mvPos;
       }
     `,
     fragmentShader: /* glsl */`
       varying vec3 vColor;
+      varying float vDepth;
 
       void main() {
+        // Sharp circular point (actual geometry)
         vec2  uv = 2.0 * gl_PointCoord - 1.0;
         float r  = dot(uv, uv);
         if (r > 1.0) discard;
 
-        // Tight glowing disc
-        float core  = smoothstep(1.0, 0.0, r);
-        float glow  = pow(core, 6.0);
-        float alpha = glow * 0.95;
+        // Feather edges slightly for anti-aliasing
+        float alpha = 1.0 - smoothstep(0.85, 1.0, r);
 
-        gl_FragColor = vec4(vColor * (0.7 + 0.3 * glow), alpha);
+        // Depth-based darkening: deeper points appear darker (canopy effect)
+        float depthFade = mix(0.5, 1.0, min(vDepth / 15.0, 1.0));
+        
+        gl_FragColor = vec4(vColor * depthFade, alpha * 0.9);
       }
     `,
-    uniforms: { uSize: { value: 2.0 } },
+    uniforms: { uSize: { value: 2.5 } },
     vertexColors: false,
     transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
+    depthWrite: true,
+    blending: THREE.NormalBlending,
   });
 }
 

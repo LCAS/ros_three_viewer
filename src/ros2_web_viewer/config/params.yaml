@@ -12,7 +12,8 @@
     fixed_frame: "base_link"        # TF frame used as world origin (RViz-style)
     target_frame: "base_link"       # Fallback TF frame (used if fixed_frame not set)
 
-    html_routes: "{'/': 'index.html', '/modular': 'examples/modular.html'}"  # Route->html path mapping (relative to web/, absolute, or use @package_name@ substitution)
+    html_routes: "{'/': 'index.html', '/phenaix_ui': 'phenaix/ui.html', '/modular': 'examples/modular.html'}"  # Route->html path mapping (relative to web/, absolute, or use @package_name@ substitution)
+    
 
     # ────────────────────────────────────────────────────────────────────────────
     # URDF link display filtering is controlled per-canvas via HTML attributes:
@@ -25,8 +26,8 @@
     # ────────────────────────────────────────────────────────────────────────────
     # Performance & rendering
     # ────────────────────────────────────────────────────────────────────────────
-    joint_states_broadcast_hz: 1.0  # Joint state websocket broadcast rate (<=0 disables throttling)
-    tf_broadcast_hz: 1.0            # Dynamic TF websocket broadcast rate (<=0 disables throttling)
+    joint_states_broadcast_hz: 0.1  # Joint state websocket broadcast rate (<=0 disables throttling)
+    tf_broadcast_hz: 0.1            # Dynamic TF websocket broadcast rate (<=0 disables throttling)
     image_broadcast_hz: 1.0         # Default image topic websocket broadcast rate (<=0 disables throttling)
     pointcloud_broadcast_hz: 1.0    # Default point cloud topic websocket broadcast rate (<=0 disables throttling)
     image_topic_broadcast_hz: "{}"       # Optional per-topic image rates as JSON/Python dict, e.g. {'/cam/front': 2.0}

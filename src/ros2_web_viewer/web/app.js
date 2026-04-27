@@ -630,9 +630,9 @@ function createLinkVisuals(linkEl, linkGroup) {
     } else if (tag === 'cylinder') {
       const r = parseFloat(child.getAttribute('radius') || 0.04);
       const l = parseFloat(child.getAttribute('length') || 0.1);
-      // URDF cylinders are along Z; Three.js CylinderGeometry is along Y
+      // URDF cylinders are along Z; Three.js CylinderGeometry is along Y.
+      // The alignment rotation is composed with the origin quaternion below.
       mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, l, 20), mat);
-      mesh.rotation.x = Math.PI / 2;
 
     } else if (tag === 'sphere') {
       const r = parseFloat(child.getAttribute('radius') || 0.04);
@@ -712,6 +712,13 @@ function createLinkVisuals(linkEl, linkGroup) {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       applyOrigin(mesh, origin);
+      if (tag === 'cylinder') {
+        // CylinderGeometry axis is along Three.js Y; URDF cylinders are along Z.
+        // Compose the alignment (Y→Z) with the origin rotation so it isn't lost:
+        //   q_final = q_origin_rpy × q_align  (align first, then origin rotation)
+        mesh.quaternion.multiply(
+          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2));
+      }
       setObjectLayerRecursive(mesh, VIEW_LAYERS.URDF);
       linkGroup.add(mesh);
     }

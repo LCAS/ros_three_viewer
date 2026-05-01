@@ -21,10 +21,9 @@
         <canvas
           class="ros-viewer-canvas"
           data-ros-widget="3d"
-          data-display="urdf pointcloud markers"
-          data-urdf-link-whitelist="ground_plane shoulder_link upper_arm_link forearm_link wrist_1_link wrist_2_link wrist_3_link turntable_base_link  micasense_body_link micasense_frame_5_link micasense_frame_4_link micasense_frame_1_link micasense_frame_3_link micasense_frame_2_link camera_link"
-          data-pointcloud-topics="/integrated_cloud /capture/depth/points_filtered"
-          data-marker-topics="/scanning_controller_markers"
+          data-display="urdf pointcloud"
+          data-urdf-link-whitelist="ground_plane base_link_inertia shoulder_link upper_arm_link forearm_link wrist_1_link wrist_2_link wrist_3_link micasense_body_link micasense_frame_5_link micasense_frame_4_link micasense_frame_1_link micasense_frame_3_link micasense_frame_2_link camera_link"
+          data-pointcloud-topics="/capture/depth/points"
           data-camera-position="2.0 1.6 2.0"
           data-camera-look-at="0 0.5 0"
           data-controls-target="0 0.4 0"
@@ -35,6 +34,7 @@
           data-controls-auto-rotate="true"
           data-controls-auto-rotate-speed="0.75"></canvas>
       </div>
+      
     </div>
 
     <div id="right-pane">

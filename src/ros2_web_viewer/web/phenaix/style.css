@@ -1,5 +1,5 @@
 /* ============================================================
-   PhenAIx — light parchment theme
+   PhenAIx — parchment theme
    Palette: #e0dca9 cream · #4a4133 brown · #30281e dark
    Font: Brother 1816 throughout
    ============================================================ */
@@ -9,30 +9,21 @@
 
 /* ── Design tokens ─────────────────────────────────────────── */
 :root {
-  --bg:           #e0dca9;
-  --bg2:          #cdc894;
-  --panel-bg:     rgba(224, 220, 169, 0.45);
-  --panel-border: rgba(74, 65, 51, 0.25);
-  --cream:        #e0dca9;
-  --cream-dim:    #b5b08a;
-  --brown:        #4a4133;
-  --brown-light:  #6b5d4a;
-  --dark:         #30281e;
-  --danger:       #c0654a;
-  --good:         #4a7a3a;
-  --warn:         #a07820;
-  --panel-blur:   blur(8px);
-  --font:         brother-1816, sans-serif;
-  --text:         #30281e;
-  --text-dim:     #6b5d4a;
+  --cream:    #e0dca9;
+  --brown:    #4a4133;
+  --dark:     #30281e;
+  --danger:   #c0654a;
+  --good:     #4a7a3a;
+  --warn:     #a07820;
+  --font:     brother-1816, sans-serif;
 }
 
 /* ── Base ──────────────────────────────────────────────────── */
 html, body {
   width: 100%; height: 100%;
   overflow: hidden;
-  background: var(--bg);
-  color: var(--text);
+  /* background: var(--cream); */
+  color: var(--dark);
   font-family: var(--font);
   font-style: normal;
   font-weight: 400;
@@ -50,13 +41,13 @@ html, body {
   z-index: 8;
 }
 
-/* ── Vignette: very subtle warm edge ──────────────────────── */
+/* ── Vignette ──────────────────────────────────────────────── */
 #vignette {
   position: fixed;
   inset: 0;
   background: radial-gradient(ellipse at center,
     transparent 55%,
-    rgba(74, 65, 51, 0.18) 100%);
+    rgba(48, 40, 30, 0.15) 100%);
   pointer-events: none;
   z-index: 9;
 }
@@ -75,14 +66,14 @@ html, body {
   position: fixed;
   top: 0; left: 0; right: 0;
   height: 52px;
-  background: rgba(224, 220, 169, 0.55);
+  background: rgba(48, 40, 30, 0.82);
   backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   padding: 0 20px;
   gap: 16px;
   z-index: 20;
-  border-bottom: 1px solid rgba(74, 65, 51, 0.22);
+  border-bottom: 1px solid rgba(224, 220, 169, 0.15);
 }
 
 #logo {
@@ -90,16 +81,16 @@ html, body {
   font-weight: 700;
   font-size: 1.5rem;
   letter-spacing: 0.06em;
-  color: var(--dark);
+  color: var(--cream);
   white-space: nowrap;
 }
-#logo span { color: var(--brown); font-style: italic; }
+#logo span { color: rgba(224, 220, 169, 0.55); font-style: italic; }
 
 #tagline {
   font-family: var(--font);
   font-weight: 300;
   font-size: 0.65rem;
-  color: var(--text-dim);
+  color: rgba(224, 220, 169, 0.60);
   letter-spacing: 0.15em;
   text-transform: uppercase;
 }
@@ -110,14 +101,14 @@ html, body {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(74, 65, 51, 0.10);
-  border: 1px solid var(--panel-border);
+  background: rgba(224, 220, 169, 0.10);
+  border: 1px solid rgba(224, 220, 169, 0.20);
   border-radius: 20px;
   padding: 4px 12px;
   font-family: var(--font);
   font-size: 0.65rem;
   letter-spacing: 0.08em;
-  color: var(--text-dim);
+  color: rgba(224, 220, 169, 0.70);
 }
 #ws-dot {
   width: 7px; height: 7px;
@@ -128,7 +119,7 @@ html, body {
 }
 #ws-dot.connected { background: var(--good); }
 
-/* ── App layout: flex centering container ──────────────────── */
+/* ── App layout ────────────────────────────────────────────── */
 #app-layout {
   position: fixed;
   top: 52px; left: 0; right: 0; bottom: 0;
@@ -152,20 +143,17 @@ html, body {
 /* ── Shared grid cell ──────────────────────────────────────── */
 .grid-cell {
   position: relative;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
+  /* background: rgba(224, 220, 169, 0.40); */
+  border: 1px solid rgba(74, 65, 51, 0.40);
   border-radius: 4px;
-  backdrop-filter: var(--panel-blur);
+  backdrop-filter: blur(4px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  box-shadow: 0 2px 8px rgba(48, 40, 30, 0.12);
+  box-shadow: 0 2px 8px rgba(48, 40, 30, 0.10);
 }
-
-.grid-cell.widget-3d    { background: rgba(48, 40, 30, 0.60); }
-.grid-cell.widget-image { background: rgba(224, 220, 169, 0.30); }
 
 /* Canvas fills cell absolutely */
 .grid-cell .ros-viewer-canvas {
@@ -175,7 +163,7 @@ html, body {
   height: 100%;
 }
 
-/* Corner label (3D cells) */
+/* Corner label on 3D cells */
 .grid-cell-label {
   position: absolute;
   top: 6px; left: 10px;
@@ -183,28 +171,29 @@ html, body {
   font-size: 0.55rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--cream-dim);
+  color: var(--cream);
+  opacity: 0.70;
   z-index: 2;
   pointer-events: none;
 }
 
-/* ── Widget header bar ─────────────────────────────────────── */
+/* ── Widget header bar — dark bg, light text ───────────────── */
 .widget-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 5px 10px;
-  border-bottom: 1px solid var(--panel-border);
+  background: rgba(48, 40, 30, 0.80);
+  border-bottom: 1px solid rgba(74, 65, 51, 0.50);
   font-family: var(--font);
   font-size: 0.58rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-dim);
-  background: rgba(224, 220, 169, 0.45);
+  color: var(--cream);
   flex-shrink: 0;
 }
 
-/* ── Image cells: uncropped, centred ───────────────────────── */
+/* ── Image cells ───────────────────────────────────────────── */
 .grid-cell.widget-image img {
   flex: 1;
   width: 100%;
@@ -222,7 +211,7 @@ html, body {
   font-family: var(--font);
   font-size: 0.6rem;
   letter-spacing: 0.1em;
-  color: var(--text-dim);
+  color: var(--brown);
   opacity: 0.6;
 }
 
@@ -235,8 +224,8 @@ html, body {
   flex: 1;
   overflow: hidden;
   padding: 8px 10px;
-  background: rgba(224, 220, 169, 0.55);
-  color: var(--text);
+  background: transparent;
+  color: var(--dark);
   font-family: var(--font);
   font-size: clamp(0.42rem, 1.5cqi, 0.82rem);
   line-height: 1.4;
@@ -266,19 +255,19 @@ html, body {
 
 .ph-updated {
   font-size: 0.85em;
-  color: var(--text-dim);
+  color: var(--brown);
   margin: 0 0 6px;
 }
 
 .ph-muted {
-  color: var(--text-dim);
+  color: var(--brown);
   font-style: italic;
 }
 
 .ph-status table {
   border-collapse: collapse;
   width: 100%;
-  background: rgba(224, 220, 169, 0.40);
+  background: rgba(224, 220, 169, 0.35);
   margin-bottom: 10px;
   font-size: inherit;
 }
@@ -297,18 +286,18 @@ html, body {
   font-weight: 600;
 }
 
-.ph-status tbody tr:nth-child(even) { background: rgba(74, 65, 51, 0.06); }
-.ph-status .row-success  { background: rgba(100, 160,  80, 0.18) !important; }
-.ph-status .row-failed   { background: rgba(192, 101,  74, 0.18) !important; }
-.ph-status .row-running  { background: rgba(201, 168,  76, 0.18) !important; }
-.ph-status .row-complete { background: rgba( 74, 120, 180, 0.18) !important; }
+.ph-status tbody tr:nth-child(even) { background: rgba(74, 65, 51, 0.08); }
+.ph-status .row-success  { background: rgba(74, 122,  58, 0.15) !important; }
+.ph-status .row-failed   { background: rgba(192, 101,  74, 0.15) !important; }
+.ph-status .row-running  { background: rgba(160, 120,  32, 0.15) !important; }
+.ph-status .row-complete { background: rgba(74,  65,  51, 0.12) !important; }
 
 /* ── Trigger buttons ───────────────────────────────────────── */
 button[data-trigger-service] {
-  border: 1px solid var(--panel-border);
+  border: 1px solid rgba(74, 65, 51, 0.40);
   border-radius: 3px;
   background: var(--cream);
-  color: var(--text);
+  color: var(--dark);
   font-family: var(--font);
   font-size: 0.7rem;
   padding: 4px 8px;
@@ -321,7 +310,7 @@ button[data-trigger-service][data-trigger-state="error"] { border-color: var(--d
 #loading {
   position: fixed;
   inset: 0;
-  background: var(--bg);
+  background: var(--cream);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -339,7 +328,7 @@ button[data-trigger-service][data-trigger-state="error"] { border-color: var(--d
   letter-spacing: 0.06em;
   color: var(--dark);
 }
-#loading-title span { color: var(--brown-light); font-style: italic; }
+#loading-title span { color: var(--brown); font-style: italic; }
 
 #loading-bar-wrap {
   width: 200px;
@@ -353,7 +342,7 @@ button[data-trigger-service][data-trigger-state="error"] { border-color: var(--d
   width: 0%;
   background: var(--brown);
   animation: load-fill 1.8s ease-in-out forwards;
-  box-shadow: 0 0 8px rgba(74, 65, 51, 0.4);
+  box-shadow: 0 0 8px rgba(74, 65, 51, 0.35);
 }
 @keyframes load-fill {
   0%   { width: 0%; }
@@ -365,7 +354,7 @@ button[data-trigger-service][data-trigger-state="error"] { border-color: var(--d
   font-family: var(--font);
   font-size: 0.65rem;
   letter-spacing: 0.15em;
-  color: var(--text-dim);
+  color: var(--brown);
   text-transform: uppercase;
   animation: blink 1.2s ease-in-out infinite;
 }
@@ -404,5 +393,5 @@ button[data-trigger-service][data-trigger-state="error"] { border-color: var(--d
 
 /* ── Scrollbar ─────────────────────────────────────────────── */
 ::-webkit-scrollbar       { width: 4px; }
-::-webkit-scrollbar-track { background: var(--bg2); }
-::-webkit-scrollbar-thumb { background: var(--brown-light); border-radius: 2px; }
+::-webkit-scrollbar-track { background: rgba(224, 220, 169, 0.30); }
+::-webkit-scrollbar-thumb { background: var(--brown); border-radius: 2px; }

@@ -1,6 +1,2 @@
 @import url('/assets/style.css');
 
-#tagline::after {
-  content: ' · co-located CSS';
-  color: rgba(224, 220, 169, 0.95);
-}

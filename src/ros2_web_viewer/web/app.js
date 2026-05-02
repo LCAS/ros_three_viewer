@@ -17,6 +17,42 @@ import { ColladaLoader }   from 'three/addons/loaders/ColladaLoader.js';
 
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Inject trigger-toast styles (works regardless of which CSS file the page uses)
+// ─────────────────────────────────────────────────────────────────────────────
+{
+  const _toastStyle = document.createElement('style');
+  _toastStyle.textContent = `
+#trigger-toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.85);
+  z-index: 9999;
+  background: rgba(48, 40, 30, 0.96);
+  color: #e0dca9;
+  border: 1px solid rgba(224, 220, 169, 0.35);
+  border-radius: 10px;
+  padding: 20px 32px;
+  font-family: sans-serif;
+  font-size: clamp(1rem, 3vw, 1.4rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: center;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s, transform 0.18s;
+}
+#trigger-toast.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+`;
+  document.head.appendChild(_toastStyle);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -28,6 +64,8 @@ const DEFAULT_FPS_THROTTLE_HZ = 25;
 const TRIGGER_TIMEOUT_DEFAULT = 2.0;
 const TRIGGER_TIMEOUT_MIN = 0.1;
 const TRIGGER_TIMEOUT_MAX = 30.0;
+const TRIGGER_REENABLE_DELAY_MS = 180;   // Re-enable delay when no cooldown configured
+const TOAST_UPDATE_INTERVAL_MS = 200;    // Countdown refresh rate for cooldown toast
 
 const VIEW_LAYERS = {
   BASE: 0,
@@ -59,7 +97,7 @@ const DEFAULT_VIEWER_TOPICS = {
 
 const threeCanvases = Array.from(document.querySelectorAll('[data-ros-widget="3d"]'));
 if (threeCanvases.length === 0) {
-  throw new Error('No 3D canvas found. Add a canvas with data-ros-widget="3d".');
+  console.info('[Viewer] No 3D canvas found — 3D rendering disabled.');
 }
 
 function getCanvasSize(canvasEl) {
@@ -1309,11 +1347,11 @@ function connectWS() {
 
     switch (msg.type) {
       case 'joint_states':
-        applyJointStates(msg.name, msg.position);
+        if (viewerWidgets.length > 0) applyJointStates(msg.name, msg.position);
         break;
 
       case 'tf':
-        applyTF(msg.transforms, msg.static, msg.fixed_frame);
+        if (viewerWidgets.length > 0) applyTF(msg.transforms, msg.static, msg.fixed_frame);
         break;
 
       case 'image':
@@ -1324,6 +1362,7 @@ function connectWS() {
         break;
 
       case 'pointcloud':
+        if (viewerWidgets.length === 0) break;
         if (activePointCloudTopics.size > 0 && !activePointCloudTopics.has(msg.topic)) {
           break;
         }
@@ -1331,6 +1370,7 @@ function connectWS() {
         break;
 
       case 'marker_array':
+        if (viewerWidgets.length === 0) break;
         if (activeMarkerArrayTopics.size > 0 && !activeMarkerArrayTopics.has(msg.topic)) {
           break;
         }
@@ -1443,6 +1483,50 @@ function normalizePanelLinks(root) {
   }
 }
 
+// ── Trigger cooldown toast ────────────────────────────────────────────────────
+
+let _triggerToastTimer = null;
+let _triggerToastCountTimer = null;
+
+function showTriggerToast(label, cooldownMs) {
+  let toast = document.getElementById('trigger-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'trigger-toast';
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    document.body.appendChild(toast);
+  }
+
+  if (_triggerToastTimer !== null) {
+    clearTimeout(_triggerToastTimer);
+    _triggerToastTimer = null;
+  }
+  if (_triggerToastCountTimer !== null) {
+    clearInterval(_triggerToastCountTimer);
+    _triggerToastCountTimer = null;
+  }
+
+  const endTime = performance.now() + cooldownMs;
+
+  function updateToast() {
+    const remaining = Math.ceil((endTime - performance.now()) / 1000);
+    toast.textContent = `"${label}" sent — please wait ${remaining}s`;
+    toast.classList.add('visible');
+  }
+  updateToast();
+  _triggerToastCountTimer = setInterval(updateToast, TOAST_UPDATE_INTERVAL_MS);
+
+  _triggerToastTimer = setTimeout(() => {
+    clearInterval(_triggerToastCountTimer);
+    _triggerToastCountTimer = null;
+    toast.classList.remove('visible');
+    _triggerToastTimer = null;
+  }, cooldownMs);
+}
+
+// ── Trigger button binding ────────────────────────────────────────────────────
+
 function bindTriggerButtons(root) {
   for (const button of root.querySelectorAll('button[data-trigger-service]')) {
     if (button.dataset.triggerBound === 'true') continue;
@@ -1458,6 +1542,10 @@ function bindTriggerButtons(root) {
       const timeoutSec = Number.isFinite(timeoutRaw)
         ? Math.min(Math.max(timeoutRaw, TRIGGER_TIMEOUT_MIN), TRIGGER_TIMEOUT_MAX)
         : TRIGGER_TIMEOUT_DEFAULT;
+
+      const cooldownRaw = Number.parseFloat(button.getAttribute('data-trigger-cooldown') || '0');
+      const cooldownSec = Number.isFinite(cooldownRaw) && cooldownRaw > 0 ? cooldownRaw : 0;
+      const cooldownMs = cooldownSec * 1000;
 
       button.disabled = true;
       button.dataset.triggerState = 'pending';
@@ -1478,10 +1566,15 @@ function bindTriggerButtons(root) {
         button.dataset.triggerState = 'error';
         button.title = `Trigger service call failed: ${err?.message || err}`;
       } finally {
+        const reenableMs = cooldownMs > 0 ? cooldownMs : TRIGGER_REENABLE_DELAY_MS;
+        if (cooldownMs > 0) {
+          const label = button.textContent.trim();
+          showTriggerToast(label, cooldownMs);
+        }
         setTimeout(() => {
           button.disabled = false;
           button.dataset.triggerState = '';
-        }, 180);
+        }, reenableMs);
       }
     });
   }
@@ -1666,7 +1759,9 @@ if (loadingEl) {
 registerViewerTopics();
 connectWS();
 registerHtmlPanelTopics();
-fetchURDF();
+if (viewerWidgets.length > 0) {
+  fetchURDF();
+  window.dispatchEvent(new Event('resize'));
+  startWidgetAnimationLoops();
+}
 bindTriggerButtons(document);
-window.dispatchEvent(new Event('resize'));
-startWidgetAnimationLoops();

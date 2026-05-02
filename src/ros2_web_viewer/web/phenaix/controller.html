@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PhenAIx · Controller</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* ── Controller-specific layout ─────────────────────────── */
+    #app-grid {
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr;
+      max-width: 1200px;
+      width: 100%;
+      aspect-ratio: unset;
+      height: 100%;
+      padding: 12px;
+      gap: 12px;
+      box-sizing: border-box;
+    }
+
+    #app-layout {
+      align-items: stretch;
+    }
+
+    /* ── Info panel (left) ───────────────────────────────────── */
+    .widget-html .html-content-inner {
+      font-size: clamp(0.75rem, 2.5cqi, 1.1rem);
+      overflow-y: auto;
+    }
+
+    /* ── Control panel (right) ───────────────────────────────── */
+    .widget-controls {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 16px;
+      padding: 20px;
+    }
+
+    .ctrl-btn {
+      width: 100%;
+      padding: clamp(16px, 3vh, 28px) 20px;
+      border: 2px solid rgba(74, 65, 51, 0.50);
+      border-radius: 8px;
+      background: rgba(224, 220, 169, 0.12);
+      color: var(--cream);
+      font-family: var(--font);
+      font-size: clamp(1rem, 2.5vw, 1.5rem);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    .ctrl-btn:active:not(:disabled) {
+      background: rgba(224, 220, 169, 0.28);
+    }
+
+    .ctrl-btn:disabled {
+      opacity: 0.40;
+      cursor: not-allowed;
+    }
+
+    .ctrl-btn[data-trigger-state="ok"]    { border-color: var(--good); }
+    .ctrl-btn[data-trigger-state="error"] { border-color: var(--danger); }
+    .ctrl-btn[data-trigger-state="pending"] { border-color: var(--warn); }
+
+    .ctrl-btn-scan   { border-color: rgba(74, 122, 58, 0.70); }
+    .ctrl-btn-stop   { border-color: rgba(192, 101, 74, 0.70); }
+    .ctrl-btn-print  { border-color: rgba(74,  65, 51, 0.60); }
+  </style>
+</head>
+<body>
+  <div id="app-layout">
+    <div id="app-grid">
+
+      <!-- Left: Plant info panel (receives HTML from /html topic) -->
+      <div class="grid-cell widget-html" data-ros-widget="html-panel" data-topic="/html">
+        <div class="widget-header">
+          <span>&#x25CF;&nbsp;PLANT INFO</span>
+          <span data-role="html-topic-label">—</span>
+        </div>
+        <div data-role="html-content" class="html-content-inner">Waiting for plant data…</div>
+      </div>
+
+      <!-- Right: Controller buttons -->
+      <div class="grid-cell widget-controls">
+        <div class="widget-header">
+          <span>&#x25CF;&nbsp;CONTROLS</span>
+        </div>
+
+        <button
+          class="ctrl-btn ctrl-btn-scan"
+          data-trigger-service="/start_capture"
+          data-trigger-timeout="10"
+          data-trigger-cooldown="3">
+          Scan (simple)
+        </button>
+
+        <!-- "Scan (leaves)" intentionally calls the same service as "Scan (simple)"
+             until a dedicated leaf-scanning service is available. -->
+        <button
+          class="ctrl-btn ctrl-btn-scan"
+          data-trigger-service="/start_capture"
+          data-trigger-timeout="10"
+          data-trigger-cooldown="3">
+          Scan (leaves)
+        </button>
+
+        <button
+          class="ctrl-btn ctrl-btn-stop"
+          data-trigger-service="/cancel_capture"
+          data-trigger-timeout="5"
+          data-trigger-cooldown="3">
+          Stop Scan
+        </button>
+
+        <button
+          class="ctrl-btn ctrl-btn-print"
+          data-trigger-service="/print"
+          data-trigger-timeout="10"
+          data-trigger-cooldown="3">
+          Print
+        </button>
+
+      </div><!-- /.widget-controls -->
+
+    </div><!-- /#app-grid -->
+  </div><!-- /#app-layout -->
+
+  <div id="bg-wallpaper"></div>
+  <div id="vignette"></div>
+  <div id="topbar">
+    <div id="logo">PhenAIx</div>
+    <div id="tagline">Controller</div>
+    <div id="topbar-spacer"></div>
+    <div id="ws-pill">
+      <div id="ws-dot"></div>
+      <span id="ws-label">OFFLINE</span>
+    </div>
+  </div>
+
+  <div id="corner-tl" class="corner"></div>
+  <div id="corner-tr" class="corner"></div>
+  <div id="corner-bl" class="corner"></div>
+  <div id="corner-br" class="corner"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three":         "/assets/vendor/three/three.module.js",
+      "three/addons/": "/assets/vendor/three/addons/"
+    }
+  }
+  </script>
+  <script type="module" src="/assets/app.js"></script>
+</body>
+</html>

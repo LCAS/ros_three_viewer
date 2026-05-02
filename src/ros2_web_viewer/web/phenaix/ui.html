@@ -16,13 +16,11 @@
 </head>
 <body>
   <div id="app-layout">
+    <div id="app-grid">
 
-    <!-- ── LEFT PANE (1/3) — Robo… ──────────────────────────── -->
-    <div id="left-pane">
-      <div class="pane-heading">Robo<span>…</span></div>
-
-      <!-- 3-D viewer: URDF + live depth point cloud -->
-      <div class="widget-block widget-3d">
+      <!-- Row 1, Col 1: Robot 3-D viewer (URDF + live depth) -->
+      <div class="grid-cell widget-3d">
+        <div class="grid-cell-label">ROBOT</div>
         <canvas
           class="ros-viewer-canvas"
           data-ros-widget="3d"
@@ -41,8 +39,37 @@
           data-controls-auto-rotate-speed="0.75"></canvas>
       </div>
 
-      <!-- Live colour image stream -->
-      <div class="widget-block widget-image" data-ros-widget="image-panel" data-topic="/capture/color/image_raw">
+      <!-- Row 1, Col 2: Integrated point cloud 3-D viewer -->
+      <div class="grid-cell widget-3d">
+        <div class="grid-cell-label">INTEGRATED CLOUD</div>
+        <canvas
+          class="ros-viewer-canvas"
+          data-ros-widget="3d"
+          data-display="pointcloud"
+          data-pointcloud-topics="/integrated_cloud"
+          data-camera-position="1.5 1.2 1.5"
+          data-camera-look-at="0 0.3 0"
+          data-controls-target="0 0.3 0"
+          data-fps-throttle="2"
+          data-controls-enable-damping="true"
+          data-controls-damping-factor="0.06"
+          data-controls-min-distance="0.1"
+          data-controls-max-distance="20"
+          data-controls-auto-rotate="true"
+          data-controls-auto-rotate-speed="1.5"></canvas>
+      </div>
+
+      <!-- Row 1, Col 3: Plant traits HTML panel -->
+      <div class="grid-cell widget-html" data-ros-widget="html-panel" data-topic="/html">
+        <div class="widget-header">
+          <span>&#x25CF;&nbsp;PLANT TRAITS</span>
+          <span data-role="html-topic-label">—</span>
+        </div>
+        <div data-role="html-content" class="html-content-inner">Waiting for plant trait data…</div>
+      </div>
+
+      <!-- Row 2, Col 1: Live colour image -->
+      <div class="grid-cell widget-image" data-ros-widget="image-panel" data-topic="/capture/color/image_raw">
         <div class="widget-header">
           <span>&#x25CF;&nbsp;COLOR FEED</span>
           <span data-role="image-topic-label">—</span>
@@ -50,73 +77,34 @@
         <img alt="color feed" />
         <div data-role="image-placeholder">NO SIGNAL</div>
       </div>
-    </div>
 
-    <!-- ── RIGHT PANE (2/3) — …Crops ────────────────────────── -->
-    <div id="right-pane">
-      <div class="pane-heading"><span>…</span>Crops</div>
-
-      <!-- 2×2 grid -->
-      <div id="crops-grid">
-
-        <!-- Top-left: integrated point cloud 3-D viewer -->
-        <div class="grid-cell widget-3d">
-          <div class="grid-cell-label">INTEGRATED CLOUD</div>
-          <canvas
-            class="ros-viewer-canvas"
-            data-ros-widget="3d"
-            data-display="pointcloud"
-            data-pointcloud-topics="/integrated_cloud"
-            data-camera-position="1.5 1.2 1.5"
-            data-camera-look-at="0 0.3 0"
-            data-controls-target="0 0.3 0"
-            data-fps-throttle="2"
-            data-controls-enable-damping="true"
-            data-controls-damping-factor="0.06"
-            data-controls-min-distance="0.1"
-            data-controls-max-distance="20"
-            data-controls-auto-rotate="true"
-            data-controls-auto-rotate-speed="1.5"></canvas>
+      <!-- Row 2, Col 2: NIR image -->
+      <div class="grid-cell widget-image" data-ros-widget="image-panel" data-topic="/micasense/images/nir">
+        <div class="widget-header">
+          <span>&#x25CF;&nbsp;NIR</span>
+          <span data-role="image-topic-label">—</span>
         </div>
+        <img alt="nir feed" />
+        <div data-role="image-placeholder">NO SIGNAL</div>
+      </div>
 
-        <!-- Top-right: plant traits HTML panel -->
-        <div class="grid-cell widget-html" data-ros-widget="html-panel" data-topic="/html">
-          <div class="widget-header">
-            <span>&#x25CF;&nbsp;PLANT TRAITS</span>
-            <span data-role="html-topic-label">—</span>
-          </div>
-          <div data-role="html-content" class="html-content-inner">Waiting for plant trait data…</div>
+      <!-- Row 2, Col 3: NDVI image -->
+      <div class="grid-cell widget-image" data-ros-widget="image-panel" data-topic="/traits/ndvi_image">
+        <div class="widget-header">
+          <span>&#x25CF;&nbsp;NDVI</span>
+          <span data-role="image-topic-label">—</span>
         </div>
+        <img alt="ndvi feed" />
+        <div data-role="image-placeholder">NO SIGNAL</div>
+      </div>
 
-        <!-- Bottom-left: NIR image stream -->
-        <div class="grid-cell widget-image" data-ros-widget="image-panel" data-topic="/micasense/images/nir">
-          <div class="widget-header">
-            <span>&#x25CF;&nbsp;NIR</span>
-            <span data-role="image-topic-label">—</span>
-          </div>
-          <img alt="nir feed" />
-          <div data-role="image-placeholder">NO SIGNAL</div>
-        </div>
-
-        <!-- Bottom-right: NDVI image stream -->
-        <div class="grid-cell widget-image" data-ros-widget="image-panel" data-topic="/traits/ndvi_image">
-          <div class="widget-header">
-            <span>&#x25CF;&nbsp;NDVI</span>
-            <span data-role="image-topic-label">—</span>
-          </div>
-          <img alt="ndvi feed" />
-          <div data-role="image-placeholder">NO SIGNAL</div>
-        </div>
-
-      </div><!-- /#crops-grid -->
-    </div>
-
+    </div><!-- /#app-grid -->
   </div><!-- /#app-layout -->
 
   <div id="bg-wallpaper"></div>
   <div id="vignette"></div>
   <div id="topbar">
-    <div id="logo">PhenAI<span>x</span></div>
+    <div id="logo">PhenAIx</div>
     <div id="tagline">Robo…Crops</div>
     <div id="topbar-spacer"></div>
     <div id="ws-pill">

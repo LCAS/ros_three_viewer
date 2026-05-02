@@ -1,82 +1,45 @@
 /* ============================================================
-   ROS2 Web Viewer — "Chelsea Flower Show" theme
-   Palette: parchment cream · warm brown · dark earth
+   PhenAIx — unified stylesheet
+   Palette: #e0dca9 cream · #4a4133 brown · #30281e dark
+   Font: Brother 1816 throughout
    ============================================================ */
 
-/* ── Reset & base ─────────────────────────────────────────── */
+/* ── Reset ─────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── Design tokens ─────────────────────────────────────────── */
 :root {
-  --bg:          #30281e;
-  --bg2:         #3a2f22;
-  --panel-bg:    rgba(48, 40, 30, 0.88);
+  --bg:           #30281e;
+  --bg2:          #3d3224;
+  --panel-bg:     rgba(48, 40, 30, 0.88);
   --panel-border: rgba(224, 220, 169, 0.20);
-  --cream:       #e0dca9;
-  --cream-dim:   #b5b08a;
-  --brown:       #4a4133;
-  --brown-light: #6b5d4a;
-  --danger:      #c0654a;
-  --good:        #7aaa6a;
-  --warn:        #c9a84c;
-  --panel-blur:  blur(12px);
+  --cream:        #e0dca9;
+  --cream-dim:    #b5b08a;
+  --brown:        #4a4133;
+  --brown-light:  #6b5d4a;
+  --danger:       #c0654a;
+  --good:         #7aaa6a;
+  --warn:         #c9a84c;
+  --panel-blur:   blur(12px);
+  --font:         brother-1816, sans-serif;
 }
 
+/* ── Base ──────────────────────────────────────────────────── */
 html, body {
   width: 100%; height: 100%;
   overflow: hidden;
   background: var(--bg);
   color: var(--cream);
-  font-family: var(--sans);
+  font-family: var(--font);
+  font-style: normal;
+  font-weight: 400;
 }
 
-/* ── Main two-pane layout ─────────────────────────────────── */
-#app-layout {
-  position: fixed;
-  top: 52px;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: stretch;
-  gap: 20px;
-  padding: 12px 20px 20px;
-  z-index: 12;
-}
-
-#left-pane {
-  flex: 0 0 auto;
-  height: 100%;
-  aspect-ratio: 1 / 1;
-  display: flex;
-  align-items: stretch;
-  justify-content: stretch;
-}
-
-#viewer-square {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.15);
-}
-
-/* ── Canvas ───────────────────────────────────────────────── */
-#canvas,
-.ros-viewer-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-/* ── Background wallpaper ─────────────────────────────────── */
+/* ── Background wallpaper ──────────────────────────────────── */
 #bg-wallpaper {
   position: fixed;
   inset: 0;
-  background-color: #d8d0a8;
+  background-color: var(--brown);
   background-image:
     url('/assets/assets/background.jpg'),
     radial-gradient(ellipse 120% 80% at 10% 90%, rgba(74,65,51,0.35) 0%, transparent 60%),
@@ -89,7 +52,7 @@ html, body {
   z-index: 8;
 }
 
-/* ── Vignette ────────────────────────────────────────────── */
+/* ── Vignette ──────────────────────────────────────────────── */
 #vignette {
   position: fixed;
   inset: 0;
@@ -100,7 +63,7 @@ html, body {
   z-index: 9;
 }
 
-/* ── Top bar ─────────────────────────────────────────────── */
+/* ── Top bar ───────────────────────────────────────────────── */
 #topbar {
   position: fixed;
   top: 0; left: 0; right: 0;
@@ -109,13 +72,13 @@ html, body {
   display: flex;
   align-items: center;
   padding: 0 20px;
-  z-index: 20;
   gap: 16px;
+  z-index: 20;
   border-bottom: 1px solid rgba(224,220,169,0.12);
 }
 
 #logo {
-  font-family: var(--serif);
+  font-family: var(--font);
   font-weight: 700;
   font-size: 1.5rem;
   letter-spacing: 0.06em;
@@ -125,7 +88,7 @@ html, body {
 #logo span { color: var(--cream-dim); font-style: italic; }
 
 #tagline {
-  font-family: var(--sans);
+  font-family: var(--font);
   font-weight: 300;
   font-size: 0.65rem;
   color: var(--cream-dim);
@@ -143,7 +106,7 @@ html, body {
   border: 1px solid var(--panel-border);
   border-radius: 20px;
   padding: 4px 12px;
-  font-family: var(--mono);
+  font-family: var(--font);
   font-size: 0.65rem;
   letter-spacing: 0.08em;
   color: var(--cream-dim);
@@ -158,207 +121,203 @@ html, body {
 }
 #ws-dot.connected { background: var(--good); }
 
-/* ── Right pane ──────────────────────────────────────────── */
-#right-pane {
-  flex: 1 1 auto;
-  width: auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-#html-panel {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 240px;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
-  backdrop-filter: var(--panel-blur);
-  overflow: hidden;
-}
-
-#html-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--panel-border);
-  font-family: var(--mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--cream-dim);
-}
-
-#html-panel-content {
+/* ── Canvas ────────────────────────────────────────────────── */
+.ros-viewer-canvas {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  flex: 1;
-  overflow: auto;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.96);
-  color: #1f2a18;
-  font-size: 0.9rem;
-  line-height: 1.45;
-}
-
-#html-panel-content h1,
-#html-panel-content h2,
-#html-panel-content h3 {
-  margin: 0 0 8px;
-  color: #1f2a18;
-}
-
-#html-panel-content p {
-  margin: 0 0 8px;
-}
-
-#html-panel-content code {
-  font-family: var(--mono);
-  font-size: 0.8rem;
-}
-
-#html-panel-content button[data-trigger-service] {
-  border: 1px solid var(--brown-light);
-  border-radius: 3px;
-  background: var(--cream);
-  color: #1f2a18;
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  padding: 4px 8px;
-  cursor: pointer;
-}
-
-#html-panel-content button[data-trigger-service][data-trigger-state="ok"] {
-  border-color: var(--good);
-}
-
-#html-panel-content button[data-trigger-service][data-trigger-state="error"] {
-  border-color: var(--danger);
-}
-
-/* ── Image panel ─────────────────────────────────────────── */
-#image-panel {
-  width: 100%;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
-  backdrop-filter: var(--panel-blur);
-  overflow: hidden;
-  transition: opacity 0.3s ease;
-}
-#image-panel.hidden {
-  opacity: 0;
-  height: 0;
-  pointer-events: none;
-}
-
-#image-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 7px 12px;
-  border-bottom: 1px solid var(--panel-border);
-  font-family: var(--mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--cream-dim);
-}
-
-#camera-image {
+  height: 100%;
   display: block;
-  width: 100%;
-  aspect-ratio: 4/3;
-  object-fit: cover;
-  background: var(--bg);
 }
-#image-placeholder {
+
+/* ── App layout: flex centering container ──────────────────── */
+#app-layout {
+  position: fixed;
+  top: 52px; left: 0; right: 0; bottom: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 12;
+}
+
+/* ── 3×2 grid stage — always 16:9 ─────────────────────────── */
+#app-grid {
+  width: min(100%, calc((100vh - 52px) * 16 / 9));
+  aspect-ratio: 16 / 9;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 8px;
+  padding: 8px;
+}
+
+/* ── Shared grid cell ──────────────────────────────────────── */
+.grid-cell {
+  position: relative;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  backdrop-filter: var(--panel-blur);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.grid-cell.widget-3d  { background: rgba(0, 0, 0, 0.15); }
+.grid-cell.widget-image { background: var(--bg); }
+
+/* Canvas fills cell absolutely */
+.grid-cell .ros-viewer-canvas {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  aspect-ratio: 4/3;
-  font-family: var(--mono);
+  height: 100%;
+}
+
+/* Corner label (3D cells) */
+.grid-cell-label {
+  position: absolute;
+  top: 6px; left: 10px;
+  font-family: var(--font);
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cream-dim);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* ── Widget header bar ─────────────────────────────────────── */
+.widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--panel-border);
+  font-family: var(--font);
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cream-dim);
+  flex-shrink: 0;
+}
+
+/* ── Image cells: uncropped, centred ───────────────────────── */
+.grid-cell.widget-image img {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  object-fit: contain;
+  object-position: center;
+  background: var(--bg);
+}
+
+.grid-cell.widget-image [data-role="image-placeholder"] {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font);
   font-size: 0.6rem;
   letter-spacing: 0.1em;
   color: var(--cream-dim);
   opacity: 0.5;
 }
 
-/* ── Corner decorations ──────────────────────────────────── */
-.corner {
-  position: fixed;
-  width: 40px; height: 40px;
-  z-index: 15;
-  pointer-events: none;
-  opacity: 0.3;
+/* ── HTML panel cell ───────────────────────────────────────── */
+.grid-cell.widget-html {
+  container-type: inline-size;
 }
-.corner::before, .corner::after {
-  content: '';
-  position: absolute;
+
+.html-content-inner {
+  flex: 1;
+  overflow: hidden;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #1f2a18;
+  font-family: var(--font);
+  font-size: clamp(0.42rem, 1.5cqi, 0.82rem);
+  line-height: 1.4;
+}
+
+.html-content-inner h1,
+.html-content-inner h2,
+.html-content-inner h3 { margin: 0 0 4px; color: #1f2a18; }
+.html-content-inner p   { margin: 0 0 4px; }
+
+/* ── PhenAIx status tables ─────────────────────────────────── */
+.ph-status h1 {
+  font-size: 1em;
+  font-weight: 700;
+  color: #2c5f2e;
+  margin: 0 0 2px;
+}
+
+.ph-status h2 {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--brown);
+  border-bottom: 2px solid #2c5f2e;
+  padding-bottom: 3px;
+  margin: 8px 0 4px;
+}
+
+.ph-updated {
+  font-size: 0.85em;
+  color: #888;
+  margin: 0 0 6px;
+}
+
+.ph-muted {
+  color: #888;
+  font-style: italic;
+}
+
+.ph-status table {
+  border-collapse: collapse;
+  width: 100%;
+  background: #fff;
+  margin-bottom: 10px;
+  font-size: inherit;
+}
+
+.ph-status th,
+.ph-status td {
+  border: 1px solid #ddd;
+  padding: 4px 7px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.ph-status thead th {
+  background: #2c5f2e;
+  color: #fff;
+  font-weight: 600;
+}
+
+.ph-status tbody tr:nth-child(even) { background: #f9f9f9; }
+.ph-status .row-success  { background: #e8f5e9 !important; }
+.ph-status .row-failed   { background: #fde8e8 !important; }
+.ph-status .row-running  { background: #fff8e1 !important; }
+.ph-status .row-complete { background: #e3f2fd !important; }
+
+/* ── Trigger buttons ───────────────────────────────────────── */
+button[data-trigger-service] {
+  border: 1px solid var(--brown-light);
+  border-radius: 3px;
   background: var(--cream);
+  color: #1f2a18;
+  font-family: var(--font);
+  font-size: 0.7rem;
+  padding: 4px 8px;
+  cursor: pointer;
 }
-.corner::before { width: 2px; height: 20px; }
-.corner::after  { width: 20px; height: 2px; }
+button[data-trigger-service][data-trigger-state="ok"]    { border-color: var(--good); }
+button[data-trigger-service][data-trigger-state="error"] { border-color: var(--danger); }
 
-#corner-tl { top: 60px; left: 12px; }
-#corner-tl::before { top: 0; left: 0; }
-#corner-tl::after  { top: 0; left: 0; }
-
-#corner-tr { top: 60px; right: 12px; }
-#corner-tr::before { top: 0; right: 0; }
-#corner-tr::after  { top: 0; right: 0; }
-
-#corner-bl { bottom: 12px; left: 12px; }
-#corner-bl::before { bottom: 0; left: 0; }
-#corner-bl::after  { bottom: 0; left: 0; }
-
-#corner-br { bottom: 12px; right: 12px; }
-#corner-br::before { bottom: 0; right: 0; }
-#corner-br::after  { bottom: 0; right: 0; }
-
-@media (max-width: 1200px) {
-  #app-layout {
-    gap: 12px;
-    padding: 10px 12px 12px;
-  }
-  #right-pane {
-    min-width: 0;
-  }
-}
-
-@media (orientation: portrait) {
-  #app-layout {
-    flex-direction: column;
-    gap: 10px;
-    padding: 8px 10px 10px;
-    overflow-y: auto;
-  }
-
-  #left-pane {
-    width: 100%;
-    height: auto;
-    max-width: 100%;
-    align-self: stretch;
-  }
-
-  #viewer-square {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 1 / 1;
-  }
-
-  #right-pane {
-    width: 100%;
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-}
-
-/* ── Loading overlay ─────────────────────────────────────── */
+/* ── Loading overlay ───────────────────────────────────────── */
 #loading {
   position: fixed;
   inset: 0;
@@ -374,7 +333,7 @@ html, body {
 #loading.fade-out { opacity: 0; pointer-events: none; }
 
 #loading-title {
-  font-family: var(--serif);
+  font-family: var(--font);
   font-weight: 700;
   font-size: 2rem;
   letter-spacing: 0.06em;
@@ -403,7 +362,7 @@ html, body {
 }
 
 #loading-sub {
-  font-family: var(--mono);
+  font-family: var(--font);
   font-size: 0.65rem;
   letter-spacing: 0.15em;
   color: var(--cream-dim);
@@ -412,223 +371,38 @@ html, body {
 }
 @keyframes blink {
   0%,100% { opacity: 1; }
-  50%      { opacity: 0.3; }
+  50%     { opacity: 0.3; }
 }
 
-/* ── Tooltip / annotations ───────────────────────────────── */
-.annotation {
-  position: absolute;
-  font-family: var(--mono);
-  font-size: 0.6rem;
-  color: var(--cream);
-  letter-spacing: 0.08em;
+/* ── Corner decorations ────────────────────────────────────── */
+.corner {
+  position: fixed;
+  width: 40px; height: 40px;
+  z-index: 15;
   pointer-events: none;
-  white-space: nowrap;
+  opacity: 0.3;
 }
+.corner::before, .corner::after {
+  content: '';
+  position: absolute;
+  background: var(--cream);
+}
+.corner::before { width: 2px; height: 20px; }
+.corner::after  { width: 20px; height: 2px; }
+#corner-tl { top: 60px; left: 12px; }
+#corner-tl::before { top: 0; left: 0; }
+#corner-tl::after  { top: 0; left: 0; }
+#corner-tr { top: 60px; right: 12px; }
+#corner-tr::before { top: 0; right: 0; }
+#corner-tr::after  { top: 0; right: 0; }
+#corner-bl { bottom: 12px; left: 12px; }
+#corner-bl::before { bottom: 0; left: 0; }
+#corner-bl::after  { bottom: 0; left: 0; }
+#corner-br { bottom: 12px; right: 12px; }
+#corner-br::before { bottom: 0; right: 0; }
+#corner-br::after  { bottom: 0; right: 0; }
 
-/* ── Scrollbar ───────────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; }
+/* ── Scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 4px; }
 ::-webkit-scrollbar-track { background: var(--bg2); }
 ::-webkit-scrollbar-thumb { background: var(--cream-dim); border-radius: 2px; }
-
-
-/* ── PhenAIx — typography: brother-1816 ────────────────── */
-:root {
-  --sans:  brother-1816, sans-serif;
-  --serif: brother-1816, sans-serif;
-}
-
-html, body, button, input, select, textarea {
-  font-family: brother-1816, sans-serif;
-  font-style: normal;
-  font-weight: 400;
-}
-
-/* ── PhenAIx — 3×2 responsive 16:9 grid layout ─────────── */
-
-/* Centre a 16:9 stage inside the fixed #app-layout area
-   (base style.css already sets: position:fixed; top:52px; left/right/bottom:0) */
-#app-layout {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  gap: 0;
-}
-
-/* The 16:9 stage scales to fill the available area without distortion */
-#app-grid {
-  /* Fill width, or shrink to stay within available height at 16:9 */
-  width: min(100%, calc((100vh - 52px) * 16 / 9));
-  aspect-ratio: 16 / 9;
-
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(2, 1fr);
-  gap: 8px;
-  padding: 8px;
-  box-sizing: border-box;
-}
-
-/* ── Shared grid cell ───────────────────────────────────── */
-.grid-cell {
-  position: relative;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
-  backdrop-filter: var(--panel-blur);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  min-width: 0;
-}
-
-/* 3-D canvas cells */
-.grid-cell.widget-3d {
-  background: rgba(0, 0, 0, 0.15);
-}
-
-/* Canvas fills its cell absolutely */
-.grid-cell .ros-viewer-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-/* Cell corner label (used on 3D cells) */
-.grid-cell-label {
-  position: absolute;
-  top: 6px;
-  left: 10px;
-  font-family: var(--mono);
-  font-size: 0.55rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--cream-dim);
-  z-index: 2;
-  pointer-events: none;
-}
-
-/* ── Shared widget header bar ───────────────────────────── */
-.widget-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 5px 10px;
-  border-bottom: 1px solid var(--panel-border);
-  font-family: var(--mono);
-  font-size: 0.58rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--cream-dim);
-  flex-shrink: 0;
-}
-
-/* ── Image cells: uncropped, centred, aspect-ratio preserved */
-.grid-cell.widget-image {
-  background: var(--bg);
-}
-
-.grid-cell.widget-image img {
-  flex: 1;
-  width: 100%;
-  min-height: 0;
-  object-fit: contain;
-  object-position: center;
-  background: var(--bg);
-}
-
-.grid-cell.widget-image [data-role="image-placeholder"] {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.1em;
-  color: var(--cream-dim);
-  opacity: 0.5;
-}
-
-/* ── HTML panel cell ────────────────────────────────────── */
-.grid-cell.widget-html {
-  background: var(--panel-bg);
-  container-type: inline-size;
-}
-
-.html-content-inner {
-  flex: 1;
-  overflow: hidden;
-  padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.96);
-  color: #1f2a18;
-  /* Font scales with cell width via container query units */
-  font-size: clamp(0.42rem, 1.5cqi, 0.82rem);
-  line-height: 1.4;
-}
-
-.html-content-inner h1,
-.html-content-inner h2,
-.html-content-inner h3 { margin: 0 0 4px; color: #1f2a18; }
-.html-content-inner p   { margin: 0 0 4px; }
-.html-content-inner code { font-family: var(--mono); font-size: 0.78em; }
-
-/* ── HTML panel: PhenAIx status tables ──────────────────── */
-.ph-status h1 {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #2c5f2e;
-  margin: 0 0 2px;
-}
-
-.ph-status h2 {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #4a4a4a;
-  border-bottom: 2px solid #2c5f2e;
-  padding-bottom: 3px;
-  margin: 10px 0 4px;
-}
-
-.ph-updated {
-  font-size: 0.72rem;
-  color: #888;
-  margin: 0 0 6px;
-}
-
-.ph-muted {
-  color: #888;
-  font-style: italic;
-  font-size: 0.8rem;
-}
-
-.ph-status table {
-  border-collapse: collapse;
-  width: 100%;
-  background: #fff;
-  margin-bottom: 12px;
-  font-size: inherit;
-}
-
-.ph-status th,
-.ph-status td {
-  border: 1px solid #ddd;
-  padding: 5px 8px;
-  text-align: left;
-  vertical-align: top;
-}
-
-.ph-status thead th {
-  background: #2c5f2e;
-  color: #fff;
-  font-weight: 600;
-}
-
-.ph-status tbody tr:nth-child(even) { background: #f9f9f9; }
-
-.ph-status .row-success { background: #e8f5e9 !important; }
-.ph-status .row-failed  { background: #fde8e8 !important; }
-.ph-status .row-running { background: #fff8e1 !important; }
-.ph-status .row-complete { background: #e3f2fd !important; }

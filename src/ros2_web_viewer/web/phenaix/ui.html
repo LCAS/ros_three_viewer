@@ -165,6 +165,8 @@
   <script type="module">
   // ── Slideshow controller ──────────────────────────────────────
   (function () {
+    const MIN_SLIDESHOW_INTERVAL_MS = 1000;
+    const DEFAULT_SLIDESHOW_INTERVAL_MS = 10000;
     const CELLS = document.querySelectorAll('.widget-slideshow[data-slideshow-interval]');
 
     for (const cell of CELLS) {
@@ -176,7 +178,10 @@
       const slides  = Array.from(track.children);
       if (slides.length < 2) continue;
 
-      const ms      = Math.max(1000, parseInt(cell.dataset.slideshowInterval, 10) || 10000);
+      const ms      = Math.max(
+        MIN_SLIDESHOW_INTERVAL_MS,
+        parseInt(cell.dataset.slideshowInterval, 10) || DEFAULT_SLIDESHOW_INTERVAL_MS,
+      );
       let   current = 0;
 
       // Build progress dots
@@ -189,7 +194,7 @@
 
       function goTo(idx) {
         current = ((idx % slides.length) + slides.length) % slides.length;
-        track.style.transform = 'translateX(-' + (current * 100) + '%)';
+        track.style.transform = `translateX(-${current * 100}%)`;
         dots.forEach(function (d, i) { d.classList.toggle('active', i === current); });
         const label = slides[current].dataset.slideTitle || '';
         if (titleEl && label) titleEl.textContent = label;

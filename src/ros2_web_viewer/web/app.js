@@ -14,10 +14,7 @@ import * as THREE from 'three';
 import { OrbitControls }   from 'three/addons/controls/OrbitControls.js';
 import { STLLoader }       from 'three/addons/loaders/STLLoader.js';
 import { ColladaLoader }   from 'three/addons/loaders/ColladaLoader.js';
-import { EffectComposer }  from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass }      from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { OutputPass }      from 'three/addons/postprocessing/OutputPass.js';
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -238,7 +235,6 @@ function enableLightOnAllLayers(light) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1e1408);
 //scene.fog = new THREE.FogExp2(0x1e1408, 0.05);
 
 // ROS (X forward, Y left, Z up) → Three (X right, Y up, Z out) basis change
@@ -257,9 +253,11 @@ const viewerWidgets = threeCanvases.map((canvasEl) => {
   const renderer = new THREE.WebGLRenderer({
     canvas: canvasEl,
     antialias: true,
+    alpha: true,
     powerPreference: 'default',
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x000000, 0);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.1;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -303,15 +301,7 @@ const viewerWidgets = threeCanvases.map((canvasEl) => {
   controls.autoRotateSpeed = parseNumberAttr(canvasEl, 'data-controls-auto-rotate-speed', 0.75);
   controls.update();
 
-  const composer = new EffectComposer(renderer);
-  composer.addPass(new RenderPass(scene, camera));
 
-  const initialCanvasSize = getCanvasSize(canvasEl);
-  const bloomPass = new UnrealBloomPass(
-    new THREE.Vector2(initialCanvasSize.width, initialCanvasSize.height),
-    /*strength*/ 0.25, /*radius*/ 0.5, /*threshold*/ 0.88);
-  composer.addPass(bloomPass);
-  composer.addPass(new OutputPass());
 
   const urdfLinkFilters = parseUrdfLinkFiltersAttr(canvasEl);
   const fpsThrottleRaw = parseNumberAttr(canvasEl, 'data-fps-throttle', DEFAULT_FPS_THROTTLE_HZ);
@@ -323,8 +313,6 @@ const viewerWidgets = threeCanvases.map((canvasEl) => {
     renderer,
     camera,
     controls,
-    composer,
-    bloomPass,
     displayConfig,
     topicConfig,
     urdfLinkFilters,
@@ -373,37 +361,7 @@ enableLightOnAllLayers(hemiLight);
 // Scene decorations
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Grid
-const gridHelper = new THREE.GridHelper(10, 30, 0x4a4133, 0x30281e);
-gridHelper.material.transparent = true;
-gridHelper.material.opacity = 0.5;
-scene.add(gridHelper);
 
-// Ground plane (shadow receiver)
-const groundMesh = new THREE.Mesh(
-  new THREE.PlaneGeometry(10, 10),
-  new THREE.ShadowMaterial({ opacity: 0.25 }),
-);
-groundMesh.rotation.x = -Math.PI / 2;
-groundMesh.receiveShadow = true;
-scene.add(groundMesh);
-
-// Origin axes marker
-{
-  const axesMat = (hex) => new THREE.MeshBasicMaterial({ color: hex });
-  const axGeo = new THREE.CylinderGeometry(0.005, 0.005, 0.15, 6);
-  const mkAxis = (color, rot) => {
-    const m = new THREE.Mesh(axGeo, axesMat(color));
-    m.rotation.copy(rot);
-    m.position.y = 0.075;
-    return m;
-  };
-  const axGroup = new THREE.Group();
-  axGroup.add(mkAxis(0xff2244, new THREE.Euler(0, 0, -Math.PI / 2)));  // X red
-  axGroup.add(mkAxis(0x22ff44, new THREE.Euler(0, 0, 0)));              // Y green
-  axGroup.add(mkAxis(0x2244ff, new THREE.Euler(Math.PI / 2, 0, 0)));   // Z blue
-  rosSceneRoot.add(axGroup);
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Point Cloud — custom GLSL shader
@@ -1671,7 +1629,7 @@ function startWidgetAnimationLoops() {
       widgetLastRenderTime = now;
 
       widget.controls.update(dt * 0.001);
-      widget.composer.render();
+      widget.renderer.render(scene, widget.camera);
     });
   }
 }
@@ -1686,8 +1644,6 @@ window.addEventListener('resize', () => {
     widget.camera.aspect = width / height;
     widget.camera.updateProjectionMatrix();
     widget.renderer.setSize(width, height, false);
-    widget.composer.setSize(width, height);
-    widget.bloomPass.resolution.set(width, height);
   }
 });
 

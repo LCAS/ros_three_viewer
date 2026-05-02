@@ -155,12 +155,13 @@ html, body {
   box-shadow: 0 2px 8px rgba(48, 40, 30, 0.10);
 }
 
-/* Canvas fills cell absolutely */
+/* Canvas fills cell absolutely, below the header */
 .grid-cell .ros-viewer-canvas {
   position: absolute;
   inset: 0;
+  top: 29px; /* clear the widget-header height (~29px) */
   width: 100%;
-  height: 100%;
+  height: calc(100% - 29px);
 }
 
 /* Corner label on 3D cells */

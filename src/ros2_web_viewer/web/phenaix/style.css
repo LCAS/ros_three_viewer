@@ -1,5 +1,5 @@
 /* ============================================================
-   PhenAIx — unified stylesheet
+   PhenAIx — light parchment theme
    Palette: #e0dca9 cream · #4a4133 brown · #30281e dark
    Font: Brother 1816 throughout
    ============================================================ */
@@ -9,19 +9,22 @@
 
 /* ── Design tokens ─────────────────────────────────────────── */
 :root {
-  --bg:           #30281e;
-  --bg2:          #3d3224;
-  --panel-bg:     rgba(48, 40, 30, 0.88);
-  --panel-border: rgba(224, 220, 169, 0.20);
+  --bg:           #e0dca9;
+  --bg2:          #cdc894;
+  --panel-bg:     rgba(224, 220, 169, 0.45);
+  --panel-border: rgba(74, 65, 51, 0.25);
   --cream:        #e0dca9;
   --cream-dim:    #b5b08a;
   --brown:        #4a4133;
   --brown-light:  #6b5d4a;
+  --dark:         #30281e;
   --danger:       #c0654a;
-  --good:         #7aaa6a;
-  --warn:         #c9a84c;
-  --panel-blur:   blur(12px);
+  --good:         #4a7a3a;
+  --warn:         #a07820;
+  --panel-blur:   blur(8px);
   --font:         brother-1816, sans-serif;
+  --text:         #30281e;
+  --text-dim:     #6b5d4a;
 }
 
 /* ── Base ──────────────────────────────────────────────────── */
@@ -29,7 +32,7 @@ html, body {
   width: 100%; height: 100%;
   overflow: hidden;
   background: var(--bg);
-  color: var(--cream);
+  color: var(--text);
   font-family: var(--font);
   font-style: normal;
   font-weight: 400;
@@ -39,28 +42,32 @@ html, body {
 #bg-wallpaper {
   position: fixed;
   inset: 0;
-  background-color: var(--brown);
-  background-image:
-    url('/assets/assets/background.jpg'),
-    radial-gradient(ellipse 120% 80% at 10% 90%, rgba(74,65,51,0.35) 0%, transparent 60%),
-    radial-gradient(ellipse 80% 120% at 90% 85%, rgba(100,120,80,0.25) 0%, transparent 55%),
-    url('/assets/assets/noise.svg');
-  background-size: cover, cover, cover, 300px 300px;
-  background-position: center, center, center, 0 0;
-  opacity: 0.20;
+  background-image: url('/assets/assets/background.jpg');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.85;
   pointer-events: none;
   z-index: 8;
 }
 
-/* ── Vignette ──────────────────────────────────────────────── */
+/* ── Vignette: very subtle warm edge ──────────────────────── */
 #vignette {
   position: fixed;
   inset: 0;
   background: radial-gradient(ellipse at center,
-    transparent 50%,
-    rgba(30, 20, 10, 0.6) 100%);
+    transparent 55%,
+    rgba(74, 65, 51, 0.18) 100%);
   pointer-events: none;
   z-index: 9;
+}
+
+/* ── Canvas ────────────────────────────────────────────────── */
+.ros-viewer-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 /* ── Top bar ───────────────────────────────────────────────── */
@@ -68,13 +75,14 @@ html, body {
   position: fixed;
   top: 0; left: 0; right: 0;
   height: 52px;
-  background: linear-gradient(180deg, rgba(48,40,30,0.95) 0%, transparent 100%);
+  background: rgba(224, 220, 169, 0.55);
+  backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   padding: 0 20px;
   gap: 16px;
   z-index: 20;
-  border-bottom: 1px solid rgba(224,220,169,0.12);
+  border-bottom: 1px solid rgba(74, 65, 51, 0.22);
 }
 
 #logo {
@@ -82,16 +90,16 @@ html, body {
   font-weight: 700;
   font-size: 1.5rem;
   letter-spacing: 0.06em;
-  color: var(--cream);
+  color: var(--dark);
   white-space: nowrap;
 }
-#logo span { color: var(--cream-dim); font-style: italic; }
+#logo span { color: var(--brown); font-style: italic; }
 
 #tagline {
   font-family: var(--font);
   font-weight: 300;
   font-size: 0.65rem;
-  color: var(--cream-dim);
+  color: var(--text-dim);
   letter-spacing: 0.15em;
   text-transform: uppercase;
 }
@@ -102,15 +110,14 @@ html, body {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: var(--panel-bg);
+  background: rgba(74, 65, 51, 0.10);
   border: 1px solid var(--panel-border);
   border-radius: 20px;
   padding: 4px 12px;
   font-family: var(--font);
   font-size: 0.65rem;
   letter-spacing: 0.08em;
-  color: var(--cream-dim);
-  backdrop-filter: var(--panel-blur);
+  color: var(--text-dim);
 }
 #ws-dot {
   width: 7px; height: 7px;
@@ -120,15 +127,6 @@ html, body {
   box-shadow: 0 0 6px currentColor;
 }
 #ws-dot.connected { background: var(--good); }
-
-/* ── Canvas ────────────────────────────────────────────────── */
-.ros-viewer-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
 
 /* ── App layout: flex centering container ──────────────────── */
 #app-layout {
@@ -163,10 +161,11 @@ html, body {
   flex-direction: column;
   min-height: 0;
   min-width: 0;
+  box-shadow: 0 2px 8px rgba(48, 40, 30, 0.12);
 }
 
-.grid-cell.widget-3d  { background: rgba(0, 0, 0, 0.15); }
-.grid-cell.widget-image { background: var(--bg); }
+.grid-cell.widget-3d    { background: rgba(48, 40, 30, 0.60); }
+.grid-cell.widget-image { background: rgba(224, 220, 169, 0.30); }
 
 /* Canvas fills cell absolutely */
 .grid-cell .ros-viewer-canvas {
@@ -200,7 +199,8 @@ html, body {
   font-size: 0.58rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--cream-dim);
+  color: var(--text-dim);
+  background: rgba(224, 220, 169, 0.45);
   flex-shrink: 0;
 }
 
@@ -211,7 +211,7 @@ html, body {
   min-height: 0;
   object-fit: contain;
   object-position: center;
-  background: var(--bg);
+  background: transparent;
 }
 
 .grid-cell.widget-image [data-role="image-placeholder"] {
@@ -222,8 +222,8 @@ html, body {
   font-family: var(--font);
   font-size: 0.6rem;
   letter-spacing: 0.1em;
-  color: var(--cream-dim);
-  opacity: 0.5;
+  color: var(--text-dim);
+  opacity: 0.6;
 }
 
 /* ── HTML panel cell ───────────────────────────────────────── */
@@ -235,8 +235,8 @@ html, body {
   flex: 1;
   overflow: hidden;
   padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.96);
-  color: #1f2a18;
+  background: rgba(224, 220, 169, 0.55);
+  color: var(--text);
   font-family: var(--font);
   font-size: clamp(0.42rem, 1.5cqi, 0.82rem);
   line-height: 1.4;
@@ -244,14 +244,14 @@ html, body {
 
 .html-content-inner h1,
 .html-content-inner h2,
-.html-content-inner h3 { margin: 0 0 4px; color: #1f2a18; }
+.html-content-inner h3 { margin: 0 0 4px; color: var(--dark); }
 .html-content-inner p   { margin: 0 0 4px; }
 
 /* ── PhenAIx status tables ─────────────────────────────────── */
 .ph-status h1 {
   font-size: 1em;
   font-weight: 700;
-  color: #2c5f2e;
+  color: var(--dark);
   margin: 0 0 2px;
 }
 
@@ -259,56 +259,56 @@ html, body {
   font-size: 0.9em;
   font-weight: 600;
   color: var(--brown);
-  border-bottom: 2px solid #2c5f2e;
+  border-bottom: 2px solid var(--brown);
   padding-bottom: 3px;
   margin: 8px 0 4px;
 }
 
 .ph-updated {
   font-size: 0.85em;
-  color: #888;
+  color: var(--text-dim);
   margin: 0 0 6px;
 }
 
 .ph-muted {
-  color: #888;
+  color: var(--text-dim);
   font-style: italic;
 }
 
 .ph-status table {
   border-collapse: collapse;
   width: 100%;
-  background: #fff;
+  background: rgba(224, 220, 169, 0.40);
   margin-bottom: 10px;
   font-size: inherit;
 }
 
 .ph-status th,
 .ph-status td {
-  border: 1px solid #ddd;
+  border: 1px solid rgba(74, 65, 51, 0.25);
   padding: 4px 7px;
   text-align: left;
   vertical-align: top;
 }
 
 .ph-status thead th {
-  background: #2c5f2e;
-  color: #fff;
+  background: var(--brown);
+  color: var(--cream);
   font-weight: 600;
 }
 
-.ph-status tbody tr:nth-child(even) { background: #f9f9f9; }
-.ph-status .row-success  { background: #e8f5e9 !important; }
-.ph-status .row-failed   { background: #fde8e8 !important; }
-.ph-status .row-running  { background: #fff8e1 !important; }
-.ph-status .row-complete { background: #e3f2fd !important; }
+.ph-status tbody tr:nth-child(even) { background: rgba(74, 65, 51, 0.06); }
+.ph-status .row-success  { background: rgba(100, 160,  80, 0.18) !important; }
+.ph-status .row-failed   { background: rgba(192, 101,  74, 0.18) !important; }
+.ph-status .row-running  { background: rgba(201, 168,  76, 0.18) !important; }
+.ph-status .row-complete { background: rgba( 74, 120, 180, 0.18) !important; }
 
 /* ── Trigger buttons ───────────────────────────────────────── */
 button[data-trigger-service] {
-  border: 1px solid var(--brown-light);
+  border: 1px solid var(--panel-border);
   border-radius: 3px;
   background: var(--cream);
-  color: #1f2a18;
+  color: var(--text);
   font-family: var(--font);
   font-size: 0.7rem;
   padding: 4px 8px;
@@ -337,23 +337,23 @@ button[data-trigger-service][data-trigger-state="error"] { border-color: var(--d
   font-weight: 700;
   font-size: 2rem;
   letter-spacing: 0.06em;
-  color: var(--cream);
+  color: var(--dark);
 }
-#loading-title span { color: var(--cream-dim); font-style: italic; }
+#loading-title span { color: var(--brown-light); font-style: italic; }
 
 #loading-bar-wrap {
   width: 200px;
   height: 2px;
-  background: rgba(224,220,169,0.15);
+  background: rgba(74, 65, 51, 0.20);
   border-radius: 1px;
   overflow: hidden;
 }
 #loading-bar {
   height: 100%;
   width: 0%;
-  background: var(--cream);
+  background: var(--brown);
   animation: load-fill 1.8s ease-in-out forwards;
-  box-shadow: 0 0 8px rgba(224,220,169,0.4);
+  box-shadow: 0 0 8px rgba(74, 65, 51, 0.4);
 }
 @keyframes load-fill {
   0%   { width: 0%; }
@@ -365,7 +365,7 @@ button[data-trigger-service][data-trigger-state="error"] { border-color: var(--d
   font-family: var(--font);
   font-size: 0.65rem;
   letter-spacing: 0.15em;
-  color: var(--cream-dim);
+  color: var(--text-dim);
   text-transform: uppercase;
   animation: blink 1.2s ease-in-out infinite;
 }
@@ -380,12 +380,12 @@ button[data-trigger-service][data-trigger-state="error"] { border-color: var(--d
   width: 40px; height: 40px;
   z-index: 15;
   pointer-events: none;
-  opacity: 0.3;
+  opacity: 0.35;
 }
 .corner::before, .corner::after {
   content: '';
   position: absolute;
-  background: var(--cream);
+  background: var(--brown);
 }
 .corner::before { width: 2px; height: 20px; }
 .corner::after  { width: 20px; height: 2px; }
@@ -405,4 +405,4 @@ button[data-trigger-service][data-trigger-state="error"] { border-color: var(--d
 /* ── Scrollbar ─────────────────────────────────────────────── */
 ::-webkit-scrollbar       { width: 4px; }
 ::-webkit-scrollbar-track { background: var(--bg2); }
-::-webkit-scrollbar-thumb { background: var(--cream-dim); border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: var(--brown-light); border-radius: 2px; }

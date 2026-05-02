@@ -3,7 +3,7 @@
    Palette: parchment cream · warm brown · dark earth
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400;700&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
+@import url('/assets/vendor/fonts/fonts.css');
 
 /* ── Reset & base ─────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

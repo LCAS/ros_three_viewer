@@ -18,11 +18,82 @@
   <div id="app-layout">
     <div id="app-grid">
 
-      <!-- Row 1, Col 1: Robot 3-D viewer (URDF + live depth) -->
+      <!-- Row 1, Col 1: Live colour image -->
+      <div class="grid-cell widget-image" data-ros-widget="image-panel" data-topic="/capture/color/image_raw">
+        <div class="widget-header">
+          <span>&#x25CF;&nbsp;COLOR FEED</span>
+          <span data-role="image-topic-label">—</span>
+        </div>
+        <p class="panel-description">Live colour video from the robot&#8217;s on-board camera &#8212; the robot&#8217;s own view as it travels autonomously through the crop row.</p>
+        <img alt="color feed" />
+        <div data-role="image-placeholder">NO SIGNAL</div>
+      </div>
+
+      <!-- Row 1, Col 2: MicaSense multispectral slideshow -->
+      <div class="grid-cell widget-slideshow" data-slideshow-interval="10000">
+        <div class="widget-header">
+          <span>&#x25CF;&nbsp;<span data-role="slideshow-title">MICASENSE</span></span>
+          <div class="slideshow-dots"></div>
+        </div>
+        <div class="slideshow-viewport">
+          <div class="slideshow-track">
+
+            <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/blue" data-slide-title="BLUE">
+              <p class="panel-description">The blue wavelength channel from the multispectral camera. Plants absorb blue light for photosynthesis; variations across the canopy reveal chlorophyll density and crop vigour.</p>
+              <img alt="blue band" />
+              <div data-role="image-placeholder">NO SIGNAL</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+            <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/green" data-slide-title="GREEN">
+              <p class="panel-description">The green channel. Healthy vegetation reflects green light strongly &#8212; which is why leaves look green to us. Used alongside other bands to assess canopy cover and crop density.</p>
+              <img alt="green band" />
+              <div data-role="image-placeholder">NO SIGNAL</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+            <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/red" data-slide-title="RED">
+              <p class="panel-description">The red channel. Plants absorb red light heavily during photosynthesis; reduced red reflectance can indicate nutrient stress or nitrogen deficiency in the crop.</p>
+              <img alt="red band" />
+              <div data-role="image-placeholder">NO SIGNAL</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+            <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/red_edge" data-slide-title="RED EDGE">
+              <p class="panel-description">The red-edge band bridges red and near-infrared wavelengths. It is highly sensitive to chlorophyll concentration and provides early warning of plant stress before it is visible to the naked eye.</p>
+              <img alt="red edge band" />
+              <div data-role="image-placeholder">NO SIGNAL</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+            <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/nir" data-slide-title="NIR">
+              <p class="panel-description">Near-infrared (NIR) light is invisible to the human eye but strongly reflected by healthy green leaves. NIR is a key input for calculating vegetation indices such as NDVI.</p>
+              <img alt="nir feed" />
+              <div data-role="image-placeholder">NO SIGNAL</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+          </div><!-- /.slideshow-track -->
+        </div><!-- /.slideshow-viewport -->
+      </div>
+
+      <!-- Row 1, Col 3: NDVI image -->
+      <div class="grid-cell widget-image" data-ros-widget="image-panel" data-topic="/traits/ndvi_image">
+        <div class="widget-header">
+          <span>&#x25CF;&nbsp;NDVI</span>
+          <span data-role="image-topic-label">—</span>
+        </div>
+        <p class="panel-description">NDVI (Normalised Difference Vegetation Index) maps vegetation health by comparing red and near-infrared reflectance. Green indicates thriving plants; red areas suggest stress or bare soil.</p>
+        <img alt="ndvi feed" />
+        <div data-role="image-placeholder">NO SIGNAL</div>
+      </div>
+
+      <!-- Row 2, Col 1: Robot 3-D viewer (URDF + live depth) -->
       <div class="grid-cell widget-3d">
         <div class="widget-header">
           <span>&#x25CF;&nbsp;ROBOT</span>
         </div>
+        <p class="panel-description">A live 3-D model of the PhenAIx field robot, animated in real time with joint and sensor data. The robot navigates autonomously between crop rows, collecting multispectral images and depth scans.</p>
         <canvas
           class="ros-viewer-canvas"
           data-ros-widget="3d"
@@ -41,11 +112,12 @@
           data-controls-auto-rotate-speed="0.75"></canvas>
       </div>
 
-      <!-- Row 1, Col 2: Integrated point cloud 3-D viewer -->
+      <!-- Row 2, Col 2: Integrated point cloud 3-D viewer -->
       <div class="grid-cell widget-3d">
         <div class="widget-header">
           <span>&#x25CF;&nbsp;INTEGRATED CLOUD</span>
         </div>
+        <p class="panel-description">A 3-D point cloud built from repeated depth-sensor passes over the crop. Scientists use this digital model to measure plant height, canopy volume, and leaf area index automatically.</p>
         <canvas
           class="ros-viewer-canvas"
           data-ros-widget="3d"
@@ -63,43 +135,14 @@
           data-controls-auto-rotate-speed="1.5"></canvas>
       </div>
 
-      <!-- Row 1, Col 3: Plant traits HTML panel -->
+      <!-- Row 2, Col 3: Plant traits HTML panel -->
       <div class="grid-cell widget-html" data-ros-widget="html-panel" data-topic="/html">
         <div class="widget-header">
           <span>&#x25CF;&nbsp;PLANT TRAITS</span>
           <span data-role="html-topic-label">—</span>
         </div>
+        <p class="panel-description">Automatically computed plant measurements &#8212; canopy height, leaf area, and spectral health scores &#8212; extracted in real time as the robot scans each plant along the row.</p>
         <div data-role="html-content" class="html-content-inner">Waiting for plant trait data…</div>
-      </div>
-
-      <!-- Row 2, Col 1: Live colour image -->
-      <div class="grid-cell widget-image" data-ros-widget="image-panel" data-topic="/capture/color/image_raw">
-        <div class="widget-header">
-          <span>&#x25CF;&nbsp;COLOR FEED</span>
-          <span data-role="image-topic-label">—</span>
-        </div>
-        <img alt="color feed" />
-        <div data-role="image-placeholder">NO SIGNAL</div>
-      </div>
-
-      <!-- Row 2, Col 2: NIR image -->
-      <div class="grid-cell widget-image" data-ros-widget="image-panel" data-topic="/micasense/images/nir">
-        <div class="widget-header">
-          <span>&#x25CF;&nbsp;NIR</span>
-          <span data-role="image-topic-label">—</span>
-        </div>
-        <img alt="nir feed" />
-        <div data-role="image-placeholder">NO SIGNAL</div>
-      </div>
-
-      <!-- Row 2, Col 3: NDVI image -->
-      <div class="grid-cell widget-image" data-ros-widget="image-panel" data-topic="/traits/ndvi_image">
-        <div class="widget-header">
-          <span>&#x25CF;&nbsp;NDVI</span>
-          <span data-role="image-topic-label">—</span>
-        </div>
-        <img alt="ndvi feed" />
-        <div data-role="image-placeholder">NO SIGNAL</div>
       </div>
 
     </div><!-- /#app-grid -->
@@ -119,5 +162,44 @@
 
   <div id="loading" style="display:none;"></div>
   <script type="module" src="/assets/app.js"></script>
+  <script type="module">
+  // ── Slideshow controller ──────────────────────────────────────
+  (function () {
+    const CELLS = document.querySelectorAll('.widget-slideshow[data-slideshow-interval]');
+
+    for (const cell of CELLS) {
+      const track    = cell.querySelector('.slideshow-track');
+      const dotsWrap = cell.querySelector('.slideshow-dots');
+      const titleEl  = cell.querySelector('[data-role="slideshow-title"]');
+      if (!track) continue;
+
+      const slides  = Array.from(track.children);
+      if (slides.length < 2) continue;
+
+      const ms      = Math.max(1000, parseInt(cell.dataset.slideshowInterval, 10) || 10000);
+      let   current = 0;
+
+      // Build progress dots
+      const dots = slides.map((slide, i) => {
+        const d = document.createElement('span');
+        d.className = 'slideshow-dot' + (i === 0 ? ' active' : '');
+        if (dotsWrap) dotsWrap.appendChild(d);
+        return d;
+      });
+
+      function goTo(idx) {
+        current = ((idx % slides.length) + slides.length) % slides.length;
+        track.style.transform = 'translateX(-' + (current * 100) + '%)';
+        dots.forEach(function (d, i) { d.classList.toggle('active', i === current); });
+        const label = slides[current].dataset.slideTitle || '';
+        if (titleEl && label) titleEl.textContent = label;
+      }
+
+      goTo(0);
+      setInterval(function () { goTo(current + 1); }, ms);
+    }
+  }());
+  </script>
 </body>
 </html>
+

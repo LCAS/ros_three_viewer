@@ -216,6 +216,93 @@ html, body {
   opacity: 0.6;
 }
 
+/* ── Panel description strip ───────────────────────────────── */
+.panel-description {
+  font-family: var(--font);
+  font-size: 0.50rem;
+  line-height: 1.45;
+  letter-spacing: 0.03em;
+  color: rgba(224, 220, 169, 0.80);
+  flex-shrink: 0;
+  padding: 4px 10px 5px;
+  background: rgba(48, 40, 30, 0.68);
+  border-bottom: 1px solid rgba(74, 65, 51, 0.25);
+  margin: 0;
+}
+
+/* On 3-D cells the canvas is absolutely positioned; overlay the description */
+.widget-3d .panel-description {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 29px; /* just below widget-header */
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* ── Slideshow widget ───────────────────────────────────────── */
+.widget-slideshow .slideshow-viewport {
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.widget-slideshow .slideshow-track {
+  display: flex;
+  height: 100%;
+  transition: transform 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: transform;
+}
+
+.widget-slideshow .slide {
+  flex: 0 0 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.widget-slideshow .slide img {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  object-fit: contain;
+  object-position: center;
+  background: transparent;
+}
+
+.widget-slideshow .slide [data-role="image-placeholder"] {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  color: var(--brown);
+  opacity: 0.6;
+}
+
+/* Progress dots inside the slideshow header */
+.slideshow-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.slideshow-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(224, 220, 169, 0.28);
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+
+.slideshow-dot.active {
+  background: rgba(224, 220, 169, 0.88);
+}
+
 /* ── HTML panel cell ───────────────────────────────────────── */
 .grid-cell.widget-html {
   container-type: inline-size;

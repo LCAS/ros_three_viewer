@@ -197,3 +197,65 @@
   color: var(--cream-dim);
   opacity: 0.5;
 }
+
+.html-content-inner {
+  
+}
+
+/* ── HTML panel: PhenAIx status tables ──────────────────── */
+.ph-status h1 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #2c5f2e;
+  margin: 0 0 2px;
+}
+
+.ph-status h2 {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #4a4a4a;
+  border-bottom: 2px solid #2c5f2e;
+  padding-bottom: 3px;
+  margin: 10px 0 4px;
+}
+
+.ph-updated {
+  font-size: 0.72rem;
+  color: #888;
+  margin: 0 0 6px;
+}
+
+.ph-muted {
+  color: #888;
+  font-style: italic;
+  font-size: 0.8rem;
+}
+
+.ph-status table {
+  border-collapse: collapse;
+  width: 100%;
+  background: #fff;
+  margin-bottom: 12px;
+  font-size: 0.78rem;
+}
+
+.ph-status th,
+.ph-status td {
+  border: 1px solid #ddd;
+  padding: 5px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.ph-status thead th {
+  background: #2c5f2e;
+  color: #fff;
+  font-weight: 600;
+}
+
+.ph-status tbody tr:nth-child(even) { background: #f9f9f9; }
+
+.ph-status .row-success { background: #e8f5e9 !important; }
+.ph-status .row-failed  { background: #fde8e8 !important; }
+.ph-status .row-running { background: #fff8e1 !important; }
+.ph-status .row-complete { background: #e3f2fd !important; }

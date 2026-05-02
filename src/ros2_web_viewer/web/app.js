@@ -1455,7 +1455,8 @@ function isSafeUrl(url) {
 const panelSanitizerConfig = {
   allowElements: ['div', 'p', 'span', 'strong', 'em', 'b', 'i', 'u',
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'ul', 'ol', 'li', 'br', 'hr', 'code', 'pre', 'blockquote', 'a', 'button'],
+    'ul', 'ol', 'li', 'br', 'hr', 'code', 'pre', 'blockquote', 'a', 'button',
+    'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col'],
   allowAttributes: {
     class: ['*'],
     id: ['*'],

@@ -158,16 +158,17 @@
 /* HTML content grid cell */
 .grid-cell.widget-html {
   background: var(--panel-bg);
+  container-type: inline-size;
 }
 
 .html-content-inner {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.96);
   color: #1f2a18;
-  font-size: 0.85rem;
-  line-height: 1.45;
+  font-size: clamp(0.45rem, 1.6cqi, 0.85rem);
+  line-height: 1.4;
 }
 
 .html-content-inner h1,
@@ -196,10 +197,6 @@
   letter-spacing: 0.1em;
   color: var(--cream-dim);
   opacity: 0.5;
-}
-
-.html-content-inner {
-  
 }
 
 /* ── HTML panel: PhenAIx status tables ──────────────────── */
@@ -236,7 +233,7 @@
   width: 100%;
   background: #fff;
   margin-bottom: 12px;
-  font-size: 0.78rem;
+  font-size: inherit;
 }
 
 .ph-status th,

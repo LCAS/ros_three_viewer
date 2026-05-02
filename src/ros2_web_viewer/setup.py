@@ -17,6 +17,12 @@ setup(
         ('share/' + package_name + '/web', glob('web/*.*')),
         ('share/' + package_name + '/web/assets', glob('web/assets/*')),
         ('share/' + package_name + '/web/examples', glob('web/examples/*')),
+        # Vendored Three.js (offline use)
+        ('share/' + package_name + '/web/vendor/three', glob('web/vendor/three/*.js')),
+        ('share/' + package_name + '/web/vendor/three/addons/controls',
+         glob('web/vendor/three/addons/controls/*.js')),
+        ('share/' + package_name + '/web/vendor/three/addons/loaders',
+         glob('web/vendor/three/addons/loaders/*.js')),
     ],
     install_requires=[
         'setuptools',

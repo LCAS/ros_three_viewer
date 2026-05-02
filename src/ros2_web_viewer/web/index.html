@@ -6,12 +6,12 @@
   <title>PhenAIx · Chelsea Flower Show Digital Twin</title>
   <link rel="stylesheet" href="/assets/style.css" />
 
-  <!-- Three.js ES module imports via importmap -->
+  <!-- Three.js ES module imports via importmap (vendored locally for offline use) -->
   <script type="importmap">
   {
     "imports": {
-      "three":          "https://unpkg.com/three@0.161.0/build/three.module.js",
-      "three/addons/":  "https://unpkg.com/three@0.161.0/examples/jsm/"
+      "three":         "/assets/vendor/three/three.module.js",
+      "three/addons/": "/assets/vendor/three/addons/"
     }
   }
   </script>

@@ -24,7 +24,7 @@
           <span>&#x25CF;&nbsp;COLOR FEED</span>
           <span data-role="image-topic-label">—</span>
         </div>
-        <p class="panel-description">Live colour video from the robot&#8217;s on-board camera &#8212; the robot&#8217;s own view as it travels autonomously through the crop row.</p>
+        <p class="panel-description">Live colour video from the robot&#8217;s RGBD camera. An RGBD camera captures both colour (<b>R</b>ed, <b>G</b>reen, <b>B</b>lue) and <b>D</b>epth information, allowing the robot to perceive the environment in 3D. The depth information is crucial for tasks such as obstacle avoidance, as well as for measuring distances and understanding the spatial layout of the environment.</p>
         <img alt="color feed" />
         <div data-role="image-placeholder">NO SIGNAL</div>
       </div>
@@ -37,6 +37,13 @@
         </div>
         <div class="slideshow-viewport">
           <div class="slideshow-track">
+
+            <div class="slide" data-ros-widget="image-panel" data-topic="/leaf_count/annotated_image" data-slide-title="LEAF COUNT">
+              <p class="panel-description">A trained AI model analyses the image and detects and counts individual leaves on the plant. This is an application of Machine Learning and Computer Vision, where a computer model has been created through training with many data examples to recognize and quantify leaves in various conditions.</p>
+              <img alt="leaf count" />
+              <div data-role="image-placeholder">NO SIGNAL</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
 
             <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/blue" data-slide-title="BLUE">
               <p class="panel-description">The blue wavelength channel from the multispectral camera. Plants absorb blue light for photosynthesis; variations across the canopy reveal chlorophyll density and crop vigour.</p>
@@ -93,17 +100,18 @@
         <div class="widget-header">
           <span>&#x25CF;&nbsp;ROBOT</span>
         </div>
-        <p class="panel-description">A live 3-D model of the PhenAIx field robot, animated in real time with joint and sensor data. The robot navigates autonomously between crop rows, collecting multispectral images and depth scans.</p>
+        <p class="panel-description">A live 3-D model of the PhenAIx field robot, animated in real time with joint and sensor data. 
+          To get the best view of a plant from multiple scans, the robot uses AI planning to determine a safe and efficient movement trajectory.</p>
         <canvas
           class="ros-viewer-canvas"
           data-ros-widget="3d"
           data-display="urdf pointcloud"
-          data-urdf-link-whitelist="ground_plane base_link_inertia shoulder_link upper_arm_link forearm_link wrist_1_link wrist_2_link wrist_3_link micasense_body_link micasense_frame_5_link micasense_frame_4_link micasense_frame_1_link micasense_frame_3_link micasense_frame_2_link camera_link"
+          data-urdf-link-whitelist="ground_plane base_link_inertia shoulder_link upper_arm_link forearm_link wrist_1_link wrist_2_link wrist_3_link micasense_body_link micasense_frame_5_link micasense_frame_4_link micasense_frame_1_link micasense_frame_3_link micasense_frame_2_link camera_link turntable_link"
           data-pointcloud-topics="/capture/depth/points"
-          data-camera-position="2.0 1.6 2.0"
+          data-camera-position="1.0 1.0 1.0"
           data-camera-look-at="0 0.5 0"
           data-controls-target="0 0.4 0"
-          data-fps-throttle="2"
+          data-fps-throttle="10"
           data-controls-enable-damping="true"
           data-controls-damping-factor="0.06"
           data-controls-min-distance="0.1"
@@ -126,7 +134,7 @@
           data-camera-position="1.5 1.2 1.5"
           data-camera-look-at="0 0.3 0"
           data-controls-target="0 0.3 0"
-          data-fps-throttle="2"
+          data-fps-throttle="10"
           data-controls-enable-damping="true"
           data-controls-damping-factor="0.06"
           data-controls-min-distance="0.1"

@@ -240,34 +240,46 @@ class ViewerServer:
 
             return static_html_asset
 
+        # Static assets are served from /assets; HTML pages come from html_routes.
+        app.mount('/assets', StaticFiles(directory=self.web_dir, html=False), name='assets')
+
         log.info('Registering %d custom HTML routes', len(self._html_routes))
-        for route_path, file_path in self._resolve_static_html_routes().items():
+        resolved_routes = self._resolve_static_html_routes()
+        root_route = resolved_routes.pop('/', None)
+
+        for route_path, file_path in resolved_routes.items():
             log.info('Registering custom HTML route: %s -> %s', route_path, file_path)
             html_file = Path(file_path)
             # For non-root routes, provide a canonical trailing-slash page URL so
             # relative links like "style.css" resolve under that route.
-            if route_path != '/':
-                canonical_html_path = f'{route_path}/'
-                app.add_api_route(
-                    route_path,
-                    _create_html_route_redirect_handler(canonical_html_path),
-                    methods=['GET'],
-                )
-                app.add_api_route(
-                    canonical_html_path,
-                    _create_html_route_handler(file_path),
-                    methods=['GET'],
-                )
-                app.add_api_route(
-                    f'{route_path}/{{asset_path:path}}',
-                    _create_html_asset_handler(route_path, html_file.parent),
-                    methods=['GET'],
-                )
-            else:
-                app.add_api_route(route_path, _create_html_route_handler(file_path), methods=['GET'])
+            canonical_html_path = f'{route_path}/'
+            app.add_api_route(
+                route_path,
+                _create_html_route_redirect_handler(canonical_html_path),
+                methods=['GET'],
+            )
+            app.add_api_route(
+                canonical_html_path,
+                _create_html_route_handler(file_path),
+                methods=['GET'],
+            )
+            app.add_api_route(
+                f'{route_path}/{{asset_path:path}}',
+                _create_html_asset_handler(route_path, html_file.parent),
+                methods=['GET'],
+            )
 
-        # Static assets are served from /assets; HTML pages come from html_routes.
-        app.mount('/assets', StaticFiles(directory=self.web_dir, html=False), name='assets')
+        # Register the root route last so it does not shadow any other routes.
+        if root_route is not None:
+            log.info('Registering custom HTML route: / -> %s', root_route)
+            html_file = Path(root_route)
+            app.add_api_route('/', _create_html_route_handler(root_route), methods=['GET'])
+            app.add_api_route(
+                '/{asset_path:path}',
+                _create_html_asset_handler('/', html_file.parent),
+                methods=['GET'],
+            )
+
 
         return app
 

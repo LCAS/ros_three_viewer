@@ -12,7 +12,7 @@
     fixed_frame: "base_link"        # TF frame used as world origin (RViz-style)
     target_frame: "base_link"       # Fallback TF frame (used if fixed_frame not set)
 
-    html_routes: "{'/': 'index.html', '/phenaix_ui': 'phenaix/ui.html', '/phenaix_controller': 'phenaix/controller.html', '/modular': 'examples/modular.html'}"  # Route->html path mapping (relative to web/, absolute, or use @package_name@ substitution)
+    html_routes: "{'/': 'phenaix/ui.html', '/phenaix_ui': 'phenaix/ui.html', '/phenaix_controller': 'phenaix/controller.html', '/modular': 'examples/modular.html'}"  # Route->html path mapping (relative to web/, absolute, or use @package_name@ substitution)
     
 
     # ────────────────────────────────────────────────────────────────────────────

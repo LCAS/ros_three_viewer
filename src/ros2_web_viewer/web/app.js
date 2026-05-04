@@ -59,7 +59,7 @@ import { ColladaLoader }   from 'three/addons/loaders/ColladaLoader.js';
 const MAX_CLOUD_PTS = 60_000;
 const URDF_RETRY_MS = 2_000;
 const WS_RETRY_MS   = 3_000;
-const WS_URL        = `ws://${location.host}/ws`;
+const WS_URL        = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 const DEFAULT_FPS_THROTTLE_HZ = 25;
 const TRIGGER_TIMEOUT_DEFAULT = 2.0;
 const TRIGGER_TIMEOUT_MIN = 0.1;

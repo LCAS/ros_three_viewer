@@ -419,7 +419,7 @@ function createPointCloudMaterial() {
         vColor = aColor;
         vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
         // Constant point size for accurate geometry visualization
-        gl_PointSize = uSize * (8.0 / -mvPos.z);
+        gl_PointSize = uSize * (4.0 / -mvPos.z);
         vDepth = -mvPos.z;
         gl_Position = projectionMatrix * mvPos;
       }
@@ -443,7 +443,7 @@ function createPointCloudMaterial() {
         gl_FragColor = vec4(vColor * depthFade, alpha * 0.9);
       }
     `,
-    uniforms: { uSize: { value: 2.5 } },
+    uniforms: { uSize: { value: 0.1 } }, // 2.5
     vertexColors: false,
     transparent: true,
     depthWrite: true,

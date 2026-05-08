@@ -45,27 +45,6 @@
               <span data-role="image-topic-label" style="display:none">—</span>
             </div>
 
-            <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/blue" data-slide-title="BLUE">
-              <p class="panel-description">The blue wavelength channel from the multispectral camera. Plants absorb blue light for photosynthesis; variations across the canopy reveal chlorophyll density and crop vigour.</p>
-              <img alt="blue band" />
-              <div data-role="image-placeholder">NO SIGNAL</div>
-              <span data-role="image-topic-label" style="display:none">—</span>
-            </div>
-
-            <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/green" data-slide-title="GREEN">
-              <p class="panel-description">The green channel. Healthy vegetation reflects green light strongly &#8212; which is why leaves look green to us. Used alongside other bands to assess canopy cover and crop density.</p>
-              <img alt="green band" />
-              <div data-role="image-placeholder">NO SIGNAL</div>
-              <span data-role="image-topic-label" style="display:none">—</span>
-            </div>
-
-            <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/red" data-slide-title="RED">
-              <p class="panel-description">The red channel. Plants absorb red light heavily during photosynthesis; reduced red reflectance can indicate nutrient stress or nitrogen deficiency in the crop.</p>
-              <img alt="red band" />
-              <div data-role="image-placeholder">NO SIGNAL</div>
-              <span data-role="image-topic-label" style="display:none">—</span>
-            </div>
-
             <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/red_edge" data-slide-title="RED EDGE">
               <p class="panel-description">The red-edge band bridges red and near-infrared wavelengths. It is highly sensitive to chlorophyll concentration and provides early warning of plant stress before it is visible to the naked eye.</p>
               <img alt="red edge band" />
@@ -171,6 +150,15 @@
   <div id="loading" style="display:none;"></div>
   <script type="module" src="/assets/app.js"></script>
   <script type="module">
+  (function () {
+    const descriptions = document.querySelectorAll('.panel-description');
+    descriptions.forEach(function (el) {
+      const text = el.textContent.trim();
+      if (!text) return;
+      el.setAttribute('title', text);
+    });
+  }());
+
   // ── Slideshow controller ──────────────────────────────────────
   (function () {
     const MIN_SLIDESHOW_INTERVAL_MS = 1000;
@@ -191,6 +179,14 @@
         parseInt(cell.dataset.slideshowInterval, 10) || DEFAULT_SLIDESHOW_INTERVAL_MS,
       );
       let   current = 0;
+      let transitionResetFrame = null;
+
+      function cancelTransitionReset() {
+        if (transitionResetFrame !== null) {
+          cancelAnimationFrame(transitionResetFrame);
+          transitionResetFrame = null;
+        }
+      }
 
       // Build progress dots
       const dots = slides.map((slide, i) => {
@@ -201,11 +197,25 @@
       });
 
       function goTo(idx) {
+        cancelTransitionReset();
         current = ((idx % slides.length) + slides.length) % slides.length;
+        const wrapped = idx >= slides.length || idx < 0;
+        if (wrapped) {
+          track.style.transition = 'none';
+        } else {
+          track.style.transition = '';
+        }
         track.style.transform = `translateX(-${current * 100}%)`;
         dots.forEach(function (d, i) { d.classList.toggle('active', i === current); });
         const label = slides[current].dataset.slideTitle || '';
         if (titleEl && label) titleEl.textContent = label;
+
+        if (wrapped) {
+          transitionResetFrame = requestAnimationFrame(function () {
+            track.style.transition = '';
+            transitionResetFrame = null;
+          });
+        }
       }
 
       goTo(0);
@@ -215,4 +225,3 @@
   </script>
 </body>
 </html>
-

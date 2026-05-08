@@ -22,6 +22,7 @@
 html, body {
   width: 100%; height: 100%;
   overflow: hidden;
+  font-size: 150%;
   /* background: var(--cream); */
   color: var(--dark);
   font-family: var(--font);
@@ -199,7 +200,7 @@ html, body {
   flex: 1;
   width: 100%;
   min-height: 0;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
   background: transparent;
 }
@@ -218,16 +219,25 @@ html, body {
 
 /* ── Panel description strip ───────────────────────────────── */
 .panel-description {
+  --panel-description-line-count: 3;
+  --panel-description-line-height: 1.35;
+  --panel-description-padding-top: 4px;
+  --panel-description-padding-bottom: 5px;
   font-family: var(--font);
   font-size: 0.80rem;
-  line-height: 1.45;
+  line-height: var(--panel-description-line-height);
   letter-spacing: 0.03em;
   color: rgba(224, 220, 169, 0.80);
   flex-shrink: 0;
-  padding: 4px 10px 5px;
+  padding: var(--panel-description-padding-top) 10px var(--panel-description-padding-bottom);
   background: rgba(48, 40, 30, 0.68);
   border-bottom: 1px solid rgba(74, 65, 51, 0.25);
   margin: 0;
+  height: calc((var(--panel-description-line-count) * var(--panel-description-line-height) * 1em) + var(--panel-description-padding-top) + var(--panel-description-padding-bottom));
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: var(--panel-description-line-count);
+  -webkit-box-orient: vertical;
 }
 
 /* On 3-D cells the canvas is absolutely positioned; overlay the description */
@@ -266,7 +276,7 @@ html, body {
   flex: 1;
   width: 100%;
   min-height: 0;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
   background: transparent;
 }

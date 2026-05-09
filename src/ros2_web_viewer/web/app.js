@@ -1613,7 +1613,8 @@ function getParameterWidgetConfig(control) {
   const type = normalizeParameterType(control.getAttribute('data-ros-param-type'));
   const defaultValueAttr = control.getAttribute('data-ros-param-default');
   const defaultValue = defaultValueAttr == null ? '' : String(defaultValueAttr);
-  const syncSecRaw = Number.parseFloat(control.getAttribute('data-ros-param-sync-sec') || '');
+  const syncSecAttr = control.getAttribute('data-ros-param-sync-sec');
+  const syncSecRaw = syncSecAttr == null ? Number.NaN : Number.parseFloat(syncSecAttr);
   const syncIntervalMs = Number.isFinite(syncSecRaw) && syncSecRaw > 0
     ? syncSecRaw * 1000
     : PARAMETER_SYNC_INTERVAL_MS;
@@ -1628,7 +1629,7 @@ function getParameterWidgetConfig(control) {
 }
 
 function setParameterControlValue(control, value) {
-  const safeValue = String(value ?? '');
+  const safeValue = value === null || value === undefined ? '' : String(value);
   if (control.tagName === 'SELECT') {
     const select = control;
     const problemOption = select.querySelector('option[data-ros-param-problem="true"]');
@@ -1703,7 +1704,7 @@ async function syncParameterControl(control, config) {
   setParameterControlValue(control, result.value);
   control.disabled = false;
   control.dataset.rosParamState = 'ok';
-  control.title = `/${config.node.split('/').filter(Boolean).join('/')} ${config.name}`;
+  control.title = `${config.node} ${config.name}`;
 }
 
 async function setParameterControlValueRemote(control, config, value) {

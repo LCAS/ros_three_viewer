@@ -3,6 +3,8 @@
 Exposes:
   GET  /api/urdf    → raw URDF XML (204 if not yet received)
   POST /api/trigger → call a std_srvs/Trigger service
+  POST /api/parameter/sync → fetch/init ROS parameter value
+  POST /api/parameter/set → set ROS parameter value
     POST /api/register_viewer_topics → subscribe to viewer data topics requested by 3D canvas widgets
   POST /api/register_html_panel_topic → subscribe to a String topic for HTML panel widgets
     GET  /assets/{path:path} → static frontend assets from web/
@@ -52,6 +54,8 @@ class ViewerServer:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._client_init_messages_getter: Callable[[], list[str]] | None = None
         self._trigger_service_caller: Callable[[str, float], dict] | None = None
+        self._parameter_sync_handler: Callable[[dict], dict] | None = None
+        self._parameter_setter: Callable[[dict], dict] | None = None
         self._viewer_topic_registrar: Callable[[dict], dict] | None = None
         self._html_panel_topic_registrar: Callable[[str], dict] | None = None
         self._html_routes: dict[str, str] = {}
@@ -127,6 +131,38 @@ class ViewerServer:
             result = await loop.run_in_executor(
                 None,
                 lambda: self._trigger_service_caller(service, timeout_sec),
+            )
+            status_code = 200 if result.get('ok', False) else 400
+            return JSONResponse(status_code=status_code, content=result)
+
+        @app.post('/api/parameter/sync')
+        async def sync_parameter(payload: dict):
+            if self._parameter_sync_handler is None:
+                return JSONResponse(
+                    status_code=503,
+                    content={'ok': False, 'error': 'Parameter sync bridge is not configured'},
+                )
+
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: self._parameter_sync_handler(payload or {}),
+            )
+            status_code = 200 if result.get('ok', False) else 400
+            return JSONResponse(status_code=status_code, content=result)
+
+        @app.post('/api/parameter/set')
+        async def set_parameter(payload: dict):
+            if self._parameter_setter is None:
+                return JSONResponse(
+                    status_code=503,
+                    content={'ok': False, 'error': 'Parameter set bridge is not configured'},
+                )
+
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: self._parameter_setter(payload or {}),
             )
             status_code = 200 if result.get('ok', False) else 400
             return JSONResponse(status_code=status_code, content=result)
@@ -293,7 +329,17 @@ class ViewerServer:
             path_str = str(rel_path or '').strip()
             if not route_str.startswith('/'):
                 route_str = f'/{route_str}'
-            if route_str in ('/ws', '/api', '/api/urdf', '/api/trigger', '/api/register_html_panel_topic', '/api/register_viewer_topics', '/assets'):
+            if route_str in (
+                '/ws',
+                '/api',
+                '/api/urdf',
+                '/api/trigger',
+                '/api/parameter/sync',
+                '/api/parameter/set',
+                '/api/register_html_panel_topic',
+                '/api/register_viewer_topics',
+                '/assets',
+            ):
                 log.warning('Skipping html route "%s": reserved route', route_str)
                 continue
             if route_str.startswith('/api/'):
@@ -348,6 +394,14 @@ class ViewerServer:
     def set_trigger_service_caller(self, caller: Callable[[str, float], dict]):
         """Register callback used by HTTP route /api/trigger."""
         self._trigger_service_caller = caller
+
+    def set_parameter_sync_handler(self, handler: Callable[[dict], dict]):
+        """Register callback used by HTTP route /api/parameter/sync."""
+        self._parameter_sync_handler = handler
+
+    def set_parameter_setter(self, setter: Callable[[dict], dict]):
+        """Register callback used by HTTP route /api/parameter/set."""
+        self._parameter_setter = setter
 
     def set_viewer_topic_registrar(self, registrar: Callable[[dict], dict]):
         """Register callback used by HTTP route /api/register_viewer_topics."""

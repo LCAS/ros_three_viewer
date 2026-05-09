@@ -14,6 +14,7 @@ Designed for public exhibits (PhenAIx plant phenotyping platform) but fully gene
 | Camera image | JPEG-compressed bridge from any `sensor_msgs/Image` topic |
 | Dynamic HTML panels | Any number of HTML panel widgets updated from `std_msgs/String` topics |
 | Trigger buttons | Buttons in panel HTML can call ROS `std_srvs/Trigger` services via `data-trigger-service` |
+| Parameter widgets | `input`/`select` controls can get/set ROS parameters via `data-ros-param-*` |
 | Post-processing | UnrealBloom pass for scanner glow effect |
 | Mesh serving | `package://` URIs resolved via `ament_index_python` → served at `/mesh/<pkg>/<path>` |
 | Auto-reconnect | WebSocket reconnects automatically if the backend restarts |
@@ -108,6 +109,10 @@ For a complete, well-documented list of all parameters with explanations, see [c
 `data-ros-widget="image-panel"` widgets use `data-topic` for image subscriptions and are registered via `POST /api/register_viewer_topics`.
 
 Buttons using `<button data-trigger-service="/my_service">` call `std_srvs/Trigger` through `POST /api/trigger`.
+
+Inputs/selects using `data-ros-param-node`, `data-ros-param-name`, `data-ros-param-type`, and
+`data-ros-param-default` are synced through `POST /api/parameter/sync` (default polling every 10s)
+and updated via `POST /api/parameter/set` on change.
 
 ## Frontend Widget Attributes
 
@@ -204,6 +209,21 @@ Implementation note:
   - Default: `2.0`
   - Clamped range: `0.1` to `30.0`
 
+### Parameter Controls (`input` / `select`)
+
+- `data-ros-param-node="/target_node"` (required)
+- `data-ros-param-name="parameter_name"` (required)
+- `data-ros-param-type="string|bool|integer|double"` (required)
+- `data-ros-param-default="..."` (required, used when parameter is not set yet)
+- `data-ros-param-sync-sec="10"` (optional, default: `10`)
+
+Behavior:
+- Supports free-text (`input`) and drop-down (`select`) controls.
+- Values are synced periodically (default every 10s).
+- On sync, unset parameters are initialised to `data-ros-param-default`.
+- On user change, values are set immediately and the control is refreshed with the typed value.
+- If parameter services for the target node are unavailable, the control is disabled and an error text is shown.
+
 ## Quick Test (without a real robot)
 
 ```bash
@@ -253,6 +273,8 @@ FastAPI (Python, background thread)
   ├── GET  /assets/... → static files (web/)
   ├── GET  /api/urdf   →  cached URDF string
   ├── POST /api/trigger → std_srvs/Trigger bridge
+  ├── POST /api/parameter/sync → typed ROS parameter get/init bridge
+  ├── POST /api/parameter/set → typed ROS parameter set bridge
   ├── POST /api/register_viewer_topics → dynamic ROS topic registration from canvas attributes
   ├── GET  /mesh/…     →  ament_index mesh proxy
   ├── GET  <html_routes keys> → configured HTML files

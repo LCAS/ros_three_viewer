@@ -50,6 +50,32 @@
         <div id="html-panel-content" data-role="html-content">Waiting for ROS HTML content…</div>
       </div>
 
+      <div class="parameter-panel" style="margin-top: 10px; border: 1px solid rgba(224, 220, 169, 0.20); border-radius: 4px; overflow: hidden;">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 7px 12px; border-bottom: 1px solid rgba(224, 220, 169, 0.20); font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--cream-dim);">
+          <span>&#x25CF;&nbsp;PARAMETERS</span>
+          <span>live sync</span>
+        </div>
+        <div style="padding: 10px 12px;">
+          <p style="margin: 0 0 8px;">Fixed frame (text input, string):</p>
+          <input
+            type="text"
+            data-ros-param-node="/ros2_web_viewer"
+            data-ros-param-name="fixed_frame"
+            data-ros-param-type="string"
+            data-ros-param-default="base_link" />
+          <p style="margin: 10px 0 8px;">Target frame (drop-down, string):</p>
+          <select
+            data-ros-param-node="/ros2_web_viewer"
+            data-ros-param-name="target_frame"
+            data-ros-param-type="string"
+            data-ros-param-default="base_link">
+            <option value="base_link">base_link</option>
+            <option value="map">map</option>
+            <option value="odom">odom</option>
+          </select>
+        </div>
+      </div>
+
       <!-- ── Camera image panel ───────────────────────────── -->
       <div id="image-panel" class="hidden" data-ros-widget="image-panel" data-topic="/camera/image_raw">
         <div id="image-header">

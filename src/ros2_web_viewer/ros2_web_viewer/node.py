@@ -41,8 +41,11 @@ import rclpy
 from rclpy.client import Client
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+from rclpy.parameter import Parameter
+from rclpy.parameter_client import AsyncParameterClient
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 
+from rcl_interfaces.msg import ParameterType
 from sensor_msgs.msg import Image, JointState, PointCloud2
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
@@ -70,6 +73,9 @@ _LATCHING_QOS = QoSProfile(
 )
 _TRIGGER_TIMEOUT_MIN = 0.1
 _TRIGGER_TIMEOUT_MAX = 30.0
+_PARAMETER_CLIENT_TIMEOUT_DEFAULT = 2.0
+_PARAMETER_CLIENT_TIMEOUT_MIN = 0.1
+_PARAMETER_CLIENT_TIMEOUT_MAX = 30.0
 _SENSOR_THROTTLE_CHECK_PERIOD_SEC = 0.1
 _ROS_PACKAGE_SUBSTITUTION_RE = re.compile(r'@([a-zA-Z0-9_]+)@')
 
@@ -145,6 +151,8 @@ class WebViewerNode(Node):
         self._html_panel_subscriptions: dict[str, object] = {}
         self._trigger_clients_lock = threading.Lock()
         self._trigger_clients: dict[str, Client] = {}
+        self._parameter_clients_lock = threading.Lock()
+        self._parameter_clients: dict[str, AsyncParameterClient] = {}
 
         # ── Parameters ──────────────────────────────────────────────────
         self.declare_parameter('pointcloud_max_points', 8000)
@@ -167,6 +175,8 @@ class WebViewerNode(Node):
         self._pointcloud_topic_broadcast_hz = self._resolve_topic_rate_map_parameter('pointcloud_topic_broadcast_hz')
         self._server.set_client_init_messages_getter(self._get_ws_init_messages)
         self._server.set_trigger_service_caller(self._call_trigger_service)
+        self._server.set_parameter_sync_handler(self.sync_parameter_value)
+        self._server.set_parameter_setter(self.set_parameter_value)
         self._server.set_viewer_topic_registrar(self.register_viewer_topics)
         self._server.set_html_panel_topic_registrar(self.register_html_panel_topic)
         self._server.set_html_routes(self._resolve_html_routes_parameter('html_routes'))
@@ -424,6 +434,308 @@ class WebViewerNode(Node):
         if not done.wait(timeout):
             return {'ok': False, 'error': f'Service "{service}" timed out'}
         return result
+
+    def _is_valid_node_name(self, node_name: str) -> bool:
+        return bool(re.fullmatch(r'/([A-Za-z0-9_]+(/[A-Za-z0-9_]+)*)', node_name))
+
+    def _is_valid_parameter_name(self, parameter_name: str) -> bool:
+        return bool(re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*', parameter_name))
+
+    @staticmethod
+    def _normalize_parameter_type(type_name: str) -> str:
+        normalized = str(type_name or '').strip().lower()
+        if normalized in ('bool', 'boolean'):
+            return 'bool'
+        if normalized in ('int', 'integer'):
+            return 'integer'
+        if normalized in ('float', 'double'):
+            return 'double'
+        if normalized in ('str', 'string'):
+            return 'string'
+        return ''
+
+    @staticmethod
+    def _parameter_type_to_ros(type_name: str) -> tuple[Parameter.Type, int] | None:
+        if type_name == 'bool':
+            return (Parameter.Type.BOOL, ParameterType.PARAMETER_BOOL)
+        if type_name == 'integer':
+            return (Parameter.Type.INTEGER, ParameterType.PARAMETER_INTEGER)
+        if type_name == 'double':
+            return (Parameter.Type.DOUBLE, ParameterType.PARAMETER_DOUBLE)
+        if type_name == 'string':
+            return (Parameter.Type.STRING, ParameterType.PARAMETER_STRING)
+        return None
+
+    def _coerce_parameter_value(self, value, type_name: str):
+        if type_name == 'bool':
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                if value in (0, 1):
+                    return bool(value)
+                raise ValueError('Expected bool-like numeric value 0 or 1')
+            if isinstance(value, str):
+                normalized = value.strip().lower()
+                if normalized in ('1', 'true', 'yes', 'on'):
+                    return True
+                if normalized in ('0', 'false', 'no', 'off'):
+                    return False
+            raise ValueError('Expected bool value')
+
+        if type_name == 'integer':
+            if isinstance(value, bool):
+                return int(value)
+            if isinstance(value, int):
+                return value
+            if isinstance(value, float):
+                if value.is_integer():
+                    return int(value)
+                raise ValueError('Expected integer value')
+            if isinstance(value, str):
+                raw = value.strip()
+                try:
+                    return int(raw, 10)
+                except ValueError:
+                    as_float = float(raw)
+                    if as_float.is_integer():
+                        return int(as_float)
+            raise ValueError('Expected integer value')
+
+        if type_name == 'double':
+            if isinstance(value, bool):
+                return float(value)
+            return float(value)
+
+        if type_name == 'string':
+            return str(value)
+
+        raise ValueError(f'Unsupported parameter type "{type_name}"')
+
+    @staticmethod
+    def _parameter_value_to_python(value_msg):
+        param_type = int(value_msg.type)
+        if param_type == ParameterType.PARAMETER_BOOL:
+            return bool(value_msg.bool_value)
+        if param_type == ParameterType.PARAMETER_INTEGER:
+            return int(value_msg.integer_value)
+        if param_type == ParameterType.PARAMETER_DOUBLE:
+            return float(value_msg.double_value)
+        if param_type == ParameterType.PARAMETER_STRING:
+            return str(value_msg.string_value)
+        return None
+
+    @staticmethod
+    def _wait_for_future_result(future, timeout_sec: float):
+        done = threading.Event()
+        result = {'value': None, 'error': None}
+
+        def _on_done(fut):
+            try:
+                result['value'] = fut.result()
+            except Exception as exc:
+                result['error'] = exc
+            finally:
+                done.set()
+
+        future.add_done_callback(_on_done)
+        if not done.wait(timeout_sec):
+            raise TimeoutError(f'Timed out after {timeout_sec:.2f}s')
+        if result['error'] is not None:
+            raise result['error']
+        return result['value']
+
+    def _get_parameter_client(self, node_name: str) -> AsyncParameterClient:
+        with self._parameter_clients_lock:
+            client = self._parameter_clients.get(node_name)
+            if client is None:
+                client = AsyncParameterClient(self, node_name)
+                self._parameter_clients[node_name] = client
+            return client
+
+    @staticmethod
+    def _parse_parameter_timeout(payload: dict) -> float:
+        timeout_raw = payload.get('timeout_sec', _PARAMETER_CLIENT_TIMEOUT_DEFAULT)
+        try:
+            timeout_sec = float(timeout_raw)
+        except (TypeError, ValueError):
+            timeout_sec = _PARAMETER_CLIENT_TIMEOUT_DEFAULT
+        return max(_PARAMETER_CLIENT_TIMEOUT_MIN, min(timeout_sec, _PARAMETER_CLIENT_TIMEOUT_MAX))
+
+    def _set_remote_parameter(
+        self,
+        client: AsyncParameterClient,
+        node_name: str,
+        parameter_name: str,
+        type_name: str,
+        raw_value,
+        timeout_sec: float,
+    ):
+        type_info = self._parameter_type_to_ros(type_name)
+        if type_info is None:
+            raise ValueError(f'Unsupported parameter type "{type_name}"')
+        parameter_type, _ = type_info
+        typed_value = self._coerce_parameter_value(raw_value, type_name)
+        parameter = Parameter(name=parameter_name, type_=parameter_type, value=typed_value)
+        response = self._wait_for_future_result(
+            client.set_parameters([parameter]),
+            timeout_sec,
+        )
+        if not response.results:
+            raise RuntimeError(f'Failed to set "{parameter_name}" on "{node_name}"')
+        result = response.results[0]
+        if not result.successful:
+            reason = str(result.reason or 'unknown reason')
+            raise RuntimeError(f'Failed to set "{parameter_name}" on "{node_name}": {reason}')
+        return typed_value
+
+    def sync_parameter_value(self, payload: dict) -> dict:
+        if not isinstance(payload, dict):
+            return {'ok': False, 'error': 'Invalid payload'}
+
+        node_name = str(payload.get('node', '')).strip()
+        parameter_name = str(payload.get('name', '')).strip()
+        type_name = self._normalize_parameter_type(payload.get('type', ''))
+        default_raw = payload.get('default_value', '')
+        timeout_sec = self._parse_parameter_timeout(payload)
+
+        if not self._is_valid_node_name(node_name):
+            return {'ok': False, 'error': f'Invalid node name "{node_name}"'}
+        if not self._is_valid_parameter_name(parameter_name):
+            return {'ok': False, 'error': f'Invalid parameter name "{parameter_name}"'}
+        if not self._parameter_type_to_ros(type_name):
+            return {'ok': False, 'error': f'Unsupported parameter type "{type_name}"'}
+
+        client = self._get_parameter_client(node_name)
+        if not client.wait_for_services(timeout_sec=timeout_sec):
+            self.get_logger().warning(
+                f'Parameter client unavailable for node "{node_name}" while syncing "{parameter_name}"',
+            )
+            return {
+                'ok': False,
+                'error': f'Parameter services for "{node_name}" are unavailable',
+                'unavailable': True,
+            }
+
+        try:
+            response = self._wait_for_future_result(
+                client.get_parameters([parameter_name]),
+                timeout_sec,
+            )
+            if not response.values:
+                raise RuntimeError(f'Node "{node_name}" returned no value for "{parameter_name}"')
+            value_msg = response.values[0]
+            value_type = int(value_msg.type)
+
+            if value_type == ParameterType.PARAMETER_NOT_SET:
+                typed_default = self._set_remote_parameter(
+                    client,
+                    node_name,
+                    parameter_name,
+                    type_name,
+                    default_raw,
+                    timeout_sec,
+                )
+                return {
+                    'ok': True,
+                    'node': node_name,
+                    'name': parameter_name,
+                    'type': type_name,
+                    'value': typed_default,
+                    'initialized_from_default': True,
+                }
+
+            current_value = self._parameter_value_to_python(value_msg)
+            try:
+                normalized_value = self._coerce_parameter_value(current_value, type_name)
+            except (TypeError, ValueError) as exc:
+                return {
+                    'ok': False,
+                    'error': f'Parameter "{parameter_name}" type mismatch on "{node_name}": {exc}',
+                }
+
+            if normalized_value != current_value:
+                normalized_value = self._set_remote_parameter(
+                    client,
+                    node_name,
+                    parameter_name,
+                    type_name,
+                    normalized_value,
+                    timeout_sec,
+                )
+
+            return {
+                'ok': True,
+                'node': node_name,
+                'name': parameter_name,
+                'type': type_name,
+                'value': normalized_value,
+                'initialized_from_default': False,
+            }
+        except TimeoutError:
+            return {
+                'ok': False,
+                'error': f'Timed out while syncing parameter "{parameter_name}" on "{node_name}"',
+                'unavailable': True,
+            }
+        except (TypeError, ValueError) as exc:
+            return {'ok': False, 'error': f'Invalid value for "{parameter_name}": {exc}'}
+        except Exception as exc:
+            return {'ok': False, 'error': f'Failed to sync "{parameter_name}" on "{node_name}": {exc}'}
+
+    def set_parameter_value(self, payload: dict) -> dict:
+        if not isinstance(payload, dict):
+            return {'ok': False, 'error': 'Invalid payload'}
+
+        node_name = str(payload.get('node', '')).strip()
+        parameter_name = str(payload.get('name', '')).strip()
+        type_name = self._normalize_parameter_type(payload.get('type', ''))
+        value_raw = payload.get('value', '')
+        timeout_sec = self._parse_parameter_timeout(payload)
+
+        if not self._is_valid_node_name(node_name):
+            return {'ok': False, 'error': f'Invalid node name "{node_name}"'}
+        if not self._is_valid_parameter_name(parameter_name):
+            return {'ok': False, 'error': f'Invalid parameter name "{parameter_name}"'}
+        if not self._parameter_type_to_ros(type_name):
+            return {'ok': False, 'error': f'Unsupported parameter type "{type_name}"'}
+
+        client = self._get_parameter_client(node_name)
+        if not client.wait_for_services(timeout_sec=timeout_sec):
+            self.get_logger().warning(
+                f'Parameter client unavailable for node "{node_name}" while setting "{parameter_name}"',
+            )
+            return {
+                'ok': False,
+                'error': f'Parameter services for "{node_name}" are unavailable',
+                'unavailable': True,
+            }
+
+        try:
+            typed_value = self._set_remote_parameter(
+                client,
+                node_name,
+                parameter_name,
+                type_name,
+                value_raw,
+                timeout_sec,
+            )
+            return {
+                'ok': True,
+                'node': node_name,
+                'name': parameter_name,
+                'type': type_name,
+                'value': typed_value,
+            }
+        except TimeoutError:
+            return {
+                'ok': False,
+                'error': f'Timed out while setting parameter "{parameter_name}" on "{node_name}"',
+                'unavailable': True,
+            }
+        except (TypeError, ValueError) as exc:
+            return {'ok': False, 'error': f'Invalid value for "{parameter_name}": {exc}'}
+        except Exception as exc:
+            return {'ok': False, 'error': f'Failed to set "{parameter_name}" on "{node_name}": {exc}'}
 
     def register_html_panel_topic(self, topic_name: str) -> dict:
         topic = str(topic_name or '').strip()

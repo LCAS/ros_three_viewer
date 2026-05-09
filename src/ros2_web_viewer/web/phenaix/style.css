@@ -404,6 +404,23 @@ button[data-trigger-service] {
 button[data-trigger-service][data-trigger-state="ok"]    { border-color: var(--good); }
 button[data-trigger-service][data-trigger-state="error"] { border-color: var(--danger); }
 
+input[data-ros-param-name],
+select[data-ros-param-name] {
+  border: 1px solid rgba(74, 65, 51, 0.40);
+  border-radius: 3px;
+  background: var(--cream);
+  color: var(--dark);
+  font-family: var(--font);
+  font-size: 0.7rem;
+  padding: 4px 8px;
+}
+
+input[data-ros-param-name][data-ros-param-state="ok"],
+select[data-ros-param-name][data-ros-param-state="ok"] { border-color: var(--good); }
+
+input[data-ros-param-name][data-ros-param-state="error"],
+select[data-ros-param-name][data-ros-param-state="error"] { border-color: var(--danger); }
+
 /* ── Loading overlay ───────────────────────────────────────── */
 #loading {
   position: fixed;

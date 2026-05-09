@@ -66,6 +66,8 @@ const TRIGGER_TIMEOUT_MIN = 0.1;
 const TRIGGER_TIMEOUT_MAX = 30.0;
 const TRIGGER_REENABLE_DELAY_MS = 180;   // Re-enable delay when no cooldown configured
 const TOAST_UPDATE_INTERVAL_MS = 200;    // Countdown refresh rate for cooldown toast
+const PARAMETER_SYNC_INTERVAL_MS = 10_000;
+const PARAMETER_REQUEST_TIMEOUT_SEC = 2.0;
 
 const VIEW_LAYERS = {
   BASE: 0,
@@ -1454,6 +1456,7 @@ const panelSanitizerConfig = {
   allowElements: ['div', 'p', 'span', 'strong', 'em', 'b', 'i', 'u',
     'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
     'ul', 'ol', 'li', 'br', 'hr', 'code', 'pre', 'blockquote', 'a', 'button',
+    'input', 'select', 'option',
     'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col'],
   allowAttributes: {
     class: ['*'],
@@ -1464,8 +1467,17 @@ const panelSanitizerConfig = {
     target: ['a'],
     rel: ['a'],
     type: ['button'],
+    value: ['input', 'option'],
+    selected: ['option'],
+    placeholder: ['input'],
+    disabled: ['button', 'input', 'select', 'option'],
     'data-trigger-service': ['button'],
     'data-trigger-timeout': ['button'],
+    'data-ros-param-node': ['input', 'select'],
+    'data-ros-param-name': ['input', 'select'],
+    'data-ros-param-type': ['input', 'select'],
+    'data-ros-param-default': ['input', 'select'],
+    'data-ros-param-sync-sec': ['input', 'select'],
   },
 };
 
@@ -1580,6 +1592,202 @@ function bindTriggerButtons(root) {
   }
 }
 
+function normalizeParameterType(rawType) {
+  const normalized = String(rawType || '').trim().toLowerCase();
+  if (normalized === 'bool' || normalized === 'boolean') return 'bool';
+  if (normalized === 'int' || normalized === 'integer') return 'integer';
+  if (normalized === 'float' || normalized === 'double') return 'double';
+  if (normalized === 'str' || normalized === 'string') return 'string';
+  return '';
+}
+
+function getParameterControls(root) {
+  return root.querySelectorAll(
+    'input[data-ros-param-node][data-ros-param-name], select[data-ros-param-node][data-ros-param-name]',
+  );
+}
+
+function getParameterWidgetConfig(control) {
+  const node = String(control.getAttribute('data-ros-param-node') || '').trim();
+  const name = String(control.getAttribute('data-ros-param-name') || '').trim();
+  const type = normalizeParameterType(control.getAttribute('data-ros-param-type'));
+  const defaultValueAttr = control.getAttribute('data-ros-param-default');
+  const defaultValue = defaultValueAttr == null ? '' : String(defaultValueAttr);
+  const syncSecRaw = Number.parseFloat(control.getAttribute('data-ros-param-sync-sec') || '');
+  const syncIntervalMs = Number.isFinite(syncSecRaw) && syncSecRaw > 0
+    ? syncSecRaw * 1000
+    : PARAMETER_SYNC_INTERVAL_MS;
+
+  return {
+    node,
+    name,
+    type,
+    defaultValue,
+    syncIntervalMs,
+  };
+}
+
+function setParameterControlValue(control, value) {
+  const safeValue = String(value ?? '');
+  if (control.tagName === 'SELECT') {
+    const select = control;
+    const problemOption = select.querySelector('option[data-ros-param-problem="true"]');
+    if (problemOption) {
+      problemOption.remove();
+    }
+    const matchingOption = Array.from(select.options).find(option => option.value === safeValue);
+    if (matchingOption) {
+      select.value = safeValue;
+    } else {
+      select.value = '';
+    }
+    return;
+  }
+  control.value = safeValue;
+}
+
+function setParameterControlUnavailable(control, message) {
+  const errorText = String(message || 'Parameter unavailable');
+  control.disabled = true;
+  control.dataset.rosParamState = 'error';
+  control.title = errorText;
+  if (control.tagName === 'SELECT') {
+    const select = control;
+    let problemOption = select.querySelector('option[data-ros-param-problem="true"]');
+    if (!problemOption) {
+      problemOption = document.createElement('option');
+      problemOption.dataset.rosParamProblem = 'true';
+      problemOption.value = '__ros_param_unavailable__';
+      select.insertBefore(problemOption, select.firstChild);
+    }
+    problemOption.textContent = errorText;
+    select.value = problemOption.value;
+  } else {
+    control.value = errorText;
+  }
+}
+
+function getParameterControlCurrentValue(control) {
+  if (control.tagName === 'SELECT') {
+    return String(control.value || '');
+  }
+  return String(control.value || '');
+}
+
+async function postParameterRequest(url, payload) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  let result = {};
+  try {
+    result = await response.json();
+  } catch {
+    result = {};
+  }
+  return { response, result };
+}
+
+async function syncParameterControl(control, config) {
+  const { response, result } = await postParameterRequest('/api/parameter/sync', {
+    node: config.node,
+    name: config.name,
+    type: config.type,
+    default_value: config.defaultValue,
+    timeout_sec: PARAMETER_REQUEST_TIMEOUT_SEC,
+  });
+  if (!response.ok || !result.ok) {
+    throw new Error(String(result?.error || `HTTP ${response.status}`));
+  }
+  setParameterControlValue(control, result.value);
+  control.disabled = false;
+  control.dataset.rosParamState = 'ok';
+  control.title = `/${config.node.split('/').filter(Boolean).join('/')} ${config.name}`;
+}
+
+async function setParameterControlValueRemote(control, config, value) {
+  const { response, result } = await postParameterRequest('/api/parameter/set', {
+    node: config.node,
+    name: config.name,
+    type: config.type,
+    value,
+    timeout_sec: PARAMETER_REQUEST_TIMEOUT_SEC,
+  });
+  if (!response.ok || !result.ok) {
+    throw new Error(String(result?.error || `HTTP ${response.status}`));
+  }
+  setParameterControlValue(control, result.value);
+  control.dataset.rosParamState = 'ok';
+}
+
+function bindParameterControls(root) {
+  for (const control of getParameterControls(root)) {
+    if (control.dataset.rosParamBound === 'true') continue;
+    control.dataset.rosParamBound = 'true';
+
+    const config = getParameterWidgetConfig(control);
+    if (!config.node || !config.name || !config.type) {
+      setParameterControlUnavailable(
+        control,
+        'Invalid parameter config (data-ros-param-node/name/type required)',
+      );
+      console.warn('[Parameter] Invalid parameter widget config', control);
+      continue;
+    }
+
+    let syncInFlight = false;
+    const runSync = async () => {
+      if (syncInFlight) return;
+      syncInFlight = true;
+      try {
+        await syncParameterControl(control, config);
+      } catch (err) {
+        setParameterControlUnavailable(control, err?.message || String(err));
+        console.warn(
+          `[Parameter] Failed to sync ${config.node}:${config.name} (${config.type})`,
+          err,
+        );
+      } finally {
+        syncInFlight = false;
+      }
+    };
+
+    const runSet = async () => {
+      const pendingValue = getParameterControlCurrentValue(control);
+      control.disabled = true;
+      control.dataset.rosParamState = 'pending';
+      try {
+        await setParameterControlValueRemote(control, config, pendingValue);
+      } catch (err) {
+        setParameterControlUnavailable(control, err?.message || String(err));
+        console.warn(
+          `[Parameter] Failed to set ${config.node}:${config.name} (${config.type})`,
+          err,
+        );
+      } finally {
+        if (control.dataset.rosParamState !== 'error') {
+          control.disabled = false;
+        }
+      }
+    };
+
+    control.addEventListener('change', (event) => {
+      event.preventDefault();
+      runSet();
+    });
+
+    runSync();
+    const timerId = window.setInterval(() => {
+      if (!control.isConnected) {
+        window.clearInterval(timerId);
+        return;
+      }
+      runSync();
+    }, config.syncIntervalMs);
+  }
+}
+
 function updateHtmlPanel(html, topic) {
   const rawHtml = String(html ?? '');
   for (const widget of htmlPanelWidgets) {
@@ -1590,6 +1798,7 @@ function updateHtmlPanel(html, topic) {
       widget.contentEl.setHTML(rawHtml, { sanitizer });
       normalizePanelLinks(widget.contentEl);
       bindTriggerButtons(widget.contentEl);
+      bindParameterControls(widget.contentEl);
     } else {
       // Degraded fallback for browsers without Sanitizer API support.
       widget.contentEl.textContent = rawHtml;
@@ -1765,3 +1974,4 @@ if (viewerWidgets.length > 0) {
   startWidgetAnimationLoops();
 }
 bindTriggerButtons(document);
+bindParameterControls(document);

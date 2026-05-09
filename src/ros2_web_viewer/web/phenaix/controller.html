@@ -147,47 +147,36 @@
         <select
           id="plant-profile-select"
           class="ctrl-param-select"
-          data-ros-param-node="/morphological_traits"
+          data-ros-param-node="/morphological_traits_extractor_node"
           data-ros-param-name="plant_profile"
           data-ros-param-type="string"
-          data-ros-param-default="tomato">
-          <option value="tomato">tomato</option>
-          <option value="ornamental">ornamental</option>
+          data-ros-param-default="plant_profile">
+          <option value="plant_profile">Generic</option>
+          <option value="tomato">Tomato</option>
+          <option value="eastern_african_lily">Eastern African Lily</option>
+          <option value="japanese_aralia">Japanese Aralia</option>
+          <option value="spanish_bayonet">Spanish Bayonet</option>
         </select>
 
+        <label class="ctrl-param-label">Services</label>
         <button
           class="ctrl-btn ctrl-btn-scan"
           data-trigger-service="/start_capture"
           data-trigger-timeout="10"
-          data-trigger-cooldown="3">
+          data-trigger-cooldown="1">
           <!-- Camera / scan icon -->
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
             <circle cx="12" cy="13" r="4"/>
           </svg>
-          Scan (simple)
-        </button>
-
-        <!-- "Scan (leaves)" intentionally calls the same service as "Scan (simple)"
-             until a dedicated leaf-scanning service is available. -->
-        <button
-          class="ctrl-btn ctrl-btn-scan"
-          data-trigger-service="/start_capture"
-          data-trigger-timeout="10"
-          data-trigger-cooldown="3">
-          <!-- Leaf icon -->
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2.5.5 6.5-3 10l-1 1"/>
-            <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
-          </svg>
-          Scan (leaves)
+          Scan
         </button>
 
         <button
           class="ctrl-btn ctrl-btn-stop"
           data-trigger-service="/cancel_capture"
           data-trigger-timeout="5"
-          data-trigger-cooldown="3">
+          data-trigger-cooldown="1">
           <!-- Stop / square icon -->
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" fill="currentColor" stroke="none"/>
@@ -195,11 +184,23 @@
           Stop Scan
         </button>
 
+        <label class="ctrl-param-label" for="dry-run-select">Printer dry run</label>
+        <select
+          id="dry-run-select"
+          class="ctrl-param-select"
+          data-ros-param-node="/printer_node"
+          data-ros-param-name="dry_run"
+          data-ros-param-type="boolean"
+          data-ros-param-default="false">
+          <option value="false">Off (print normally)</option>
+          <option value="true">On (skip printing)</option>
+        </select>
+
         <button
           class="ctrl-btn ctrl-btn-print"
           data-trigger-service="/print"
           data-trigger-timeout="10"
-          data-trigger-cooldown="3">
+          data-trigger-cooldown="1">
           <!-- Printer icon -->
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <polyline points="6 9 6 2 18 2 18 9"/>

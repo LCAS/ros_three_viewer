@@ -341,6 +341,7 @@ const viewerWidgets = threeCanvases.map((canvasEl, widgetIndex) => {
   controls.autoRotate = parseBoolAttr(canvasEl, 'data-controls-auto-rotate', true);
   controls.autoRotateSpeed = parseNumberAttr(canvasEl, 'data-controls-auto-rotate-speed', 0.75);
   controls.update();
+  controls.saveState(); // save correct initial state (target0, position0)
 
 
 
@@ -1942,7 +1943,8 @@ function startWidgetAnimationLoops() {
         return;
       }
 
-      const dt = Math.max(0, elapsedSinceRender);
+      // Cap dt to one frame interval to prevent a large first-frame auto-rotate jump.
+      const dt = Math.min(Math.max(0, elapsedSinceRender), widget.frameIntervalMs);
       widgetLastRenderTime = now;
 
       widget.controls.update(dt * 0.001);

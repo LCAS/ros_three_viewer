@@ -293,6 +293,21 @@ html, body {
   opacity: 0.6;
 }
 
+/* ── STEM team slideshow overrides ─────────────────────────── */
+.widget-slideshow--team .slide img {
+  flex: 3;
+  object-fit: contain;
+  object-position: center top;
+}
+
+.widget-slideshow--team .slide [data-role="image-placeholder"] {
+  flex: 1;
+  font-size: 1.0rem;
+  align-items: flex-start;
+  padding: 0.4em 0.6em;
+  opacity: 0.85;
+}
+
 /* Progress dots inside the slideshow header */
 .slideshow-dots {
   display: flex;

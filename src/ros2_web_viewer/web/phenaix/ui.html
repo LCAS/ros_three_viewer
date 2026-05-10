@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PhenAIx@CFS · Robo…Crops</title>
+  <title>ROBO*CROPS : PhenAIx </title>
   <link rel="stylesheet" href="style.css" />
   <script type="importmap">
   {
@@ -21,11 +21,11 @@
       <!-- Row 1, Col 1: Live colour image -->
       <div class="grid-cell widget-image" data-ros-widget="image-panel" data-topic="/capture/color/image_raw">
         <div class="widget-header">
-          <span>&#x25CF;&nbsp;COLOR FEED</span>
+          <span>&#x25CF;&nbsp;COLOUR FEED</span>
           <span data-role="image-topic-label">—</span>
         </div>
-        <p class="panel-description">Live colour video from the robot&#8217;s RGBD camera. An RGBD camera captures both colour (<b>R</b>ed, <b>G</b>reen, <b>B</b>lue) and <b>D</b>epth information, allowing the robot to perceive the environment in 3D. The depth information is crucial for tasks such as obstacle avoidance, as well as for measuring distances and understanding the spatial layout of the environment.</p>
-        <img alt="color feed" />
+        <p class="panel-description">What is the robot seeing? This is what the robot&#8217;s <b>colour</b> (<b style="color:rgb(255,0,0)">R</b>ed, <b style="color:rgb(0,255,0)">G</b>reen, <b style="color:rgb(0,0,255)">B</b>lue) and <b style="color:rgb(48,40,30)">D</b><b>epth</b> cameras are capturing, 30 times per second.</p>
+        <img alt="colour feed" />
         <div data-role="image-placeholder">NO SIGNAL</div>
       </div>
 
@@ -39,21 +39,21 @@
           <div class="slideshow-track">
 
             <div class="slide" data-ros-widget="image-panel" data-topic="/leaf_count/annotated_image" data-slide-title="LEAF COUNT">
-              <p class="panel-description">A trained AI model analyses the image and detects and counts individual leaves on the plant. This is an application of Machine Learning and Computer Vision, where a computer model has been created through training with many data examples to recognize and quantify leaves in various conditions.</p>
+              <p class="panel-description">An AI model -- trained by a scientist -- detects and counts individual leaves found within each image of the plant, helping track plant growth.</p>
               <img alt="leaf count" />
               <div data-role="image-placeholder">NO SIGNAL</div>
               <span data-role="image-topic-label" style="display:none">—</span>
             </div>
 
             <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/red_edge" data-slide-title="RED EDGE">
-              <p class="panel-description">The red-edge band bridges red and near-infrared wavelengths. It is highly sensitive to chlorophyll concentration and provides early warning of plant stress before it is visible to the naked eye.</p>
+              <p class="panel-description">Red-Edge analysis highlights unhealthy amounts of chlorophyll, an early indicator of plant stress, by combining light wavelengths.</p>
               <img alt="red edge band" />
               <div data-role="image-placeholder">NO SIGNAL</div>
               <span data-role="image-topic-label" style="display:none">—</span>
             </div>
 
             <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/nir" data-slide-title="NIR">
-              <p class="panel-description">Near-infrared (NIR) light is invisible to the human eye but strongly reflected by healthy green leaves. NIR is a key input for calculating vegetation indices such as NDVI.</p>
+              <p class="panel-description">Near-Infrared light spans wavelengths that are invisible to the naked (human) eye, but strongly reflected by healthy green leaves.</p>
               <img alt="nir feed" />
               <div data-role="image-placeholder">NO SIGNAL</div>
               <span data-role="image-topic-label" style="display:none">—</span>
@@ -69,7 +69,7 @@
           <span>&#x25CF;&nbsp;NDVI</span>
           <span data-role="image-topic-label">—</span>
         </div>
-        <p class="panel-description">NDVI (Normalised Difference Vegetation Index) maps vegetation health by comparing red and near-infrared reflectance. Green indicates thriving plants; red areas suggest stress or bare soil.</p>
+        <p class="panel-description">NDVI analysis maps vegetation health by comparing reflectances: <b style="color:rgb(0,255,0)">green</b> indicates thriving plants; <b style="color:rgb(255,0,0)">red</b> suggests stress or soil.</p>
         <img alt="ndvi feed" />
         <div data-role="image-placeholder">NO SIGNAL</div>
       </div>
@@ -77,16 +77,15 @@
       <!-- Row 2, Col 1: Robot 3-D viewer (URDF + live depth) -->
       <div class="grid-cell widget-3d">
         <div class="widget-header">
-          <span>&#x25CF;&nbsp;ROBOT</span>
+          <span>&#x25CF;&nbsp;ROBOT-AIDED MODELLING</span>
         </div>
-        <p class="panel-description">A live 3-D model of the PhenAIx field robot, animated in real time with joint and sensor data. 
-          To get the best view of a plant from multiple scans, the robot uses AI planning to determine a safe and efficient movement trajectory.</p>
+        <p class="panel-description">The robot system uses AI to plan its motions (arm&amp;camera), as well as the plant pedestal, to construct a live 3D model of what it sees.</p>
         <canvas
           class="ros-viewer-canvas"
           data-ros-widget="3d"
           data-display="urdf pointcloud"
           data-urdf-link-whitelist="ground_plane base_link_inertia shoulder_link upper_arm_link forearm_link wrist_1_link wrist_2_link wrist_3_link micasense_body_link micasense_frame_5_link micasense_frame_4_link micasense_frame_1_link micasense_frame_3_link micasense_frame_2_link camera_link turntable_link"
-          data-pointcloud-topics="/partial_cloud"
+          data-pointcloud-topics="/capture/depth/points"
           data-camera-position="1.0 1.0 0.8"
           data-camera-look-at="0 0.2 0"
           data-controls-target="0 0.2 0"
@@ -99,27 +98,105 @@
           data-controls-auto-rotate-speed="0.75"></canvas>
       </div>
 
-      <!-- Row 2, Col 2: Integrated point cloud 3-D viewer -->
-      <div class="grid-cell widget-3d">
+      <!-- Row 2, Col 2: STEM careers slideshow -->
+      <div class="grid-cell widget-slideshow" data-slideshow-interval="2000">
         <div class="widget-header">
-          <span>&#x25CF;&nbsp;INTEGRATED CLOUD</span>
+          <span>&#x25CF;&nbsp;<span data-role="slideshow-title">MEET OUR STEM TEAM</span></span>
+          <!-- <div class="slideshow-dots"></div> -->
         </div>
-        <p class="panel-description">A 3-D point cloud built from repeated depth-sensor passes over the crop. Scientists use this digital model to measure plant height, canopy volume, and canopy footprint automatically.</p>
-        <canvas
-          class="ros-viewer-canvas"
-          data-ros-widget="3d"
-          data-display="pointcloud"
-          data-pointcloud-topics="/partial_cloud"
-          data-camera-position="1.0 1.0 0.7"
-          data-camera-look-at="0 0.45 0"
-          data-controls-target="0 0.45 0"
-          data-fps-throttle="10"
-          data-controls-enable-damping="true"
-          data-controls-damping-factor="0.06"
-          data-controls-min-distance="0.1"
-          data-controls-max-distance="20"
-          data-controls-auto-rotate="true"
-          data-controls-auto-rotate-speed="1.5"></canvas>
+        <div class="slideshow-viewport">
+          <div class="slideshow-track">
+
+	    <!-- TEAM MEMBERS IN ALPHABETICAL ORDER -->
+
+            <!-- <p class="panel-description">Meet our team and learn about our careers in <b style="color:rgb(48,40,30)">S</b>cience, <b style="color:rgb(48,40,30)">T</b>echnology, <b style="color:rgb(48,40,30)">E</b>ngineering, <b style="color:rgb(48,40,30)">M</b>aths: from Robotics &amp; AI to Plant Science.</p> -->
+
+	    <div class="slide" data-ros-widget="" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Elizabeth.png" alt="elizabeth" />
+              <div data-role="image-placeholder">Elizabeth is a professor in Robotics and AI. She studied Computer Science and taught for many years before joining LIAT to work on agricultural robotics. She is Director of the Lincoln Institute for Agri-food Technology (LIAT).</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+            <div class="slide" data-ros-widget="image-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Heather.png" alt="heather" />
+              <div data-role="image-placeholder">Heather is our stakeholder relationships manager.</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+	    <div class="slide" data-ros-widget="image-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Jack.png" alt="jack" />
+              <div data-role="image-placeholder">Jack is a PhD student in AI who is studying the use of AI to model aspects of leaves and canopies of strawberry plants. He is a member of the UKRI Centre for Doctoral Training in Sustainable Understandable agri-food Systems Transformed by AI (SUSTAIN). </div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+	    <div class="slide" data-ros-widget="image-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/JamesH.png" alt="james h" />
+              <div data-role="image-placeholder">James H is a PhD student in Robotics who is studying "fleet management" -- how groups of robots coordinate to perform tasks together. He is a member of the EPSRC Centre for Doctoral Training in Agri-Food Robotics (AgriFoRwArdS). </div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+	    <div class="slide" data-ros-widget="image-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/JamesW.png" alt="james w" />
+              <div data-role="image-placeholder">James W is a Plant Scientist and applied horticultural scientist, with susbstantial experience in and passion for STEM education.</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+	    <div class="slide" data-ros-widget="image-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Krystian.png" alt="krystian" />
+              <div data-role="image-placeholder">Krystian is a Plant specialist and technical resource manager in LIAT. He runs our geothermal glasshouse and is responsible for our strawberries, in the glasshouse as well as in our polytunnel.</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+	    <div class="slide" data-ros-widget="image-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Lyn.png" alt="lyn" />
+              <div data-role="image-placeholder">Lyn is manager of LIAT, who takes care of everything that everyone else on the team forgets to do!</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+            <div class="slide" data-ros-widget="image-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Marc.png" alt="marc" />
+              <div data-role="image-placeholder">Marc is a professor in Robotics. He is Director of AgriFoRwArdS and Director of the Lincoln Centre for Autonomous Systems (L-CAS).</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+	    <div class="slide" data-ros-widget="image-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Ollie.png" alt="ollie" />
+              <div data-role="image-placeholder">Ollie is a postdoctoral research in Robotics.</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+	    <div class="slide" data-ros-widget="image-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Paula.png" alt="paula" />
+              <div data-role="image-placeholder">Paula is operations director for LIAT and senior project manager, with a PhD in biology. </div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+	    <div class="slide" data-ros-widget="image-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Rob.png" alt="rob" />
+              <div data-role="image-placeholder">Rob is a Robotics specialist, a mechatronics engineer extraordinaire!</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+	    <div class="slide" data-ros-widget="image-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/SP1.png" alt="sp1" />
+              <div data-role="image-placeholder">Simon (1) is a professor in agricutural engineering. He is the Founding Director of the Lincoln Institute for Agri-food Technology (LIAT).</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+	    <div class="slide" data-ros-widget="image-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/SP2.png" alt="sp2" />
+              <div data-role="image-placeholder">Simon (2) is a professor in AI and machine learning. He is Director of SUSTAIN and Research Director of LIAT.</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+	    <div class="slide" data-ros-widget="image-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Yoon.png" alt="yoon" />
+              <div data-role="image-placeholder">YOON</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+          </div><!-- /.slideshow-track -->
+        </div><!-- /.slideshow-viewport -->
       </div>
 
       <!-- Row 2, Col 3: Plant traits HTML panel -->
@@ -128,7 +205,7 @@
           <span>&#x25CF;&nbsp;PLANT TRAITS</span>
           <span data-role="html-topic-label">—</span>
         </div>
-        <p class="panel-description">Automatically computed plant measurements &#8212; canopy height, height/width ratio, and spectral health scores &#8212; extracted in real time as the robot scans each plant along the row.</p>
+        <!-- p class="panel-description"></p -->
         <div data-role="html-content" class="html-content-inner">Waiting for plant trait data…</div>
       </div>
 
@@ -138,8 +215,8 @@
   <div id="bg-wallpaper"></div>
   <div id="vignette"></div>
   <div id="topbar">
-    <div id="logo">PhenAIx@CFS</div>
-    <div id="tagline">Robo…Crops</div>
+    <div id="logo">ROBO&#x26B9;CROPS : PhenAIx &#x21D2; Robotic Phenotyping using AI</div>
+    <div id="tagline"></div>
     <div id="topbar-spacer"></div>
     <div id="ws-pill">
       <div id="ws-dot"></div>

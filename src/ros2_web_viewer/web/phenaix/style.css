@@ -188,7 +188,7 @@ html, body {
   background: rgba(48, 40, 30, 0.80);
   border-bottom: 1px solid rgba(74, 65, 51, 0.50);
   font-family: var(--font);
-  font-size: 0.58rem;
+  font-size: 1.0rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--cream);
@@ -224,28 +224,28 @@ html, body {
   --panel-description-padding-top: 4px;
   --panel-description-padding-bottom: 5px;
   font-family: var(--font);
-  font-size: 0.80rem;
+  font-size: 1.0rem;
   line-height: var(--panel-description-line-height);
   letter-spacing: 0.03em;
   color: rgba(224, 220, 169, 0.80);
   flex-shrink: 0;
   padding: var(--panel-description-padding-top) 10px var(--panel-description-padding-bottom);
   background: rgba(48, 40, 30, 0.68);
-  border-bottom: 1px solid rgba(74, 65, 51, 0.25);
+  border-top: 1px solid rgba(74, 65, 51, 0.25);
   margin: 0;
   height: calc((var(--panel-description-line-count) * var(--panel-description-line-height) * 1em) + var(--panel-description-padding-top) + var(--panel-description-padding-bottom));
+  min-height: calc((var(--panel-description-line-count) * var(--panel-description-line-height) * 1em) + var(--panel-description-padding-top) + var(--panel-description-padding-bottom));
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: var(--panel-description-line-count);
-  -webkit-box-orient: vertical;
+  display: block;
+  order: 10;
 }
 
-/* On 3-D cells the canvas is absolutely positioned; overlay the description */
+/* On 3-D cells the canvas is absolutely positioned; overlay the description at the bottom */
 .widget-3d .panel-description {
   position: absolute;
   left: 0;
   right: 0;
-  top: 29px; /* just below widget-header */
+  bottom: 0;
   z-index: 3;
   pointer-events: none;
 }
@@ -281,7 +281,7 @@ html, body {
   background: transparent;
 }
 
-.widget-slideshow .slide [data-role="image-placeholder"] {
+.widget-slideshow .slide [data-role="image-placeholder"]:not(.panel-description) {
   flex: 1;
   display: flex;
   align-items: center;
@@ -291,6 +291,25 @@ html, body {
   letter-spacing: 0.1em;
   color: var(--brown);
   opacity: 0.6;
+}
+
+/* ── STEM team slideshow overrides ─────────────────────────── */
+.widget-slideshow--team .slide img {
+  flex: 1 1 0;
+  min-height: 0;
+  width: auto;
+  max-width: calc(100% - 1.5em);
+  max-height: calc(100% - 1.5em);
+  aspect-ratio: 1 / 1;
+  align-self: center;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 50%;
+  margin: 0.75em auto;
+}
+
+.widget-slideshow--team .slide .panel-description {
+  margin-top: auto;
 }
 
 /* Progress dots inside the slideshow header */
@@ -403,23 +422,6 @@ button[data-trigger-service] {
 }
 button[data-trigger-service][data-trigger-state="ok"]    { border-color: var(--good); }
 button[data-trigger-service][data-trigger-state="error"] { border-color: var(--danger); }
-
-input[data-ros-param-name],
-select[data-ros-param-name] {
-  border: 1px solid rgba(74, 65, 51, 0.40);
-  border-radius: 3px;
-  background: var(--cream);
-  color: var(--dark);
-  font-family: var(--font);
-  font-size: 0.7rem;
-  padding: 4px 8px;
-}
-
-input[data-ros-param-name][data-ros-param-state="ok"],
-select[data-ros-param-name][data-ros-param-state="ok"] { border-color: var(--good); }
-
-input[data-ros-param-name][data-ros-param-state="error"],
-select[data-ros-param-name][data-ros-param-state="error"] { border-color: var(--danger); }
 
 /* ── Loading overlay ───────────────────────────────────────── */
 #loading {

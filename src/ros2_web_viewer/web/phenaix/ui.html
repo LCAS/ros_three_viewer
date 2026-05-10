@@ -25,8 +25,8 @@
           <span data-role="image-topic-label">—</span>
         </div>
         <p class="panel-description">What is the robot seeing? This is what the robot&#8217;s <b>colour</b> (<b style="color:rgb(255,0,0)">R</b>ed, <b style="color:rgb(0,255,0)">G</b>reen, <b style="color:rgb(0,0,255)">B</b>lue) and <b style="color:rgb(48,40,30)">D</b><b>epth</b> cameras are capturing, 30 times per second.</p>
-        <img alt="colour feed" />
-        <div data-role="image-placeholder">NO SIGNAL</div>
+        <img alt="colour feed" style="display:none" />
+        <div data-role="image-placeholder">AWAITING DATA</div>
       </div>
 
       <!-- Row 1, Col 2: MicaSense multispectral slideshow -->
@@ -40,22 +40,22 @@
 
             <div class="slide" data-ros-widget="image-panel" data-topic="/leaf_count/annotated_image" data-slide-title="LEAF COUNT">
               <p class="panel-description">An AI model -- trained by a scientist -- detects and counts individual leaves found within each image of the plant, helping track plant growth.</p>
-              <img alt="leaf count" />
-              <div data-role="image-placeholder">NO SIGNAL</div>
+              <img alt="leaf count" style="display:none" />
+              <div data-role="image-placeholder">AWAITING DATA</div>
               <span data-role="image-topic-label" style="display:none">—</span>
             </div>
 
             <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/red_edge" data-slide-title="RED EDGE">
               <p class="panel-description">Red-Edge analysis highlights unhealthy amounts of chlorophyll, an early indicator of plant stress, by combining light wavelengths.</p>
-              <img alt="red edge band" />
-              <div data-role="image-placeholder">NO SIGNAL</div>
+              <img alt="red edge band" style="display:none" />
+              <div data-role="image-placeholder">AWAITING DATA</div>
               <span data-role="image-topic-label" style="display:none">—</span>
             </div>
 
             <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/nir" data-slide-title="NIR">
               <p class="panel-description">Near-Infrared light spans wavelengths that are invisible to the naked (human) eye, but strongly reflected by healthy green leaves.</p>
-              <img alt="nir feed" />
-              <div data-role="image-placeholder">NO SIGNAL</div>
+              <img alt="nir feed" style="display:none" />
+              <div data-role="image-placeholder">AWAITING DATA</div>
               <span data-role="image-topic-label" style="display:none">—</span>
             </div>
 
@@ -70,8 +70,8 @@
           <span data-role="image-topic-label">—</span>
         </div>
         <p class="panel-description">NDVI analysis maps vegetation health by comparing reflectances: <b style="color:rgb(0,255,0)">green</b> indicates thriving plants; <b style="color:rgb(255,0,0)">red</b> suggests stress or soil.</p>
-        <img alt="ndvi feed" />
-        <div data-role="image-placeholder">NO SIGNAL</div>
+        <img alt="ndvi feed" style="display:none" />
+        <div data-role="image-placeholder">AWAITING DATA</div>
       </div>
 
       <!-- Row 2, Col 1: Robot 3-D viewer (URDF + live depth) -->

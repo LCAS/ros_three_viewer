@@ -307,12 +307,14 @@ const viewerWidgets = threeCanvases.map((canvasEl, widgetIndex) => {
   const cameraFov = parseNumberAttr(canvasEl, 'data-camera-fov', 55);
   const cameraNear = parseNumberAttr(canvasEl, 'data-camera-near', 0.001);
   const cameraFar = parseNumberAttr(canvasEl, 'data-camera-far', 60);
-  const [cameraX, cameraY, cameraZ] = parseVector3Attr(canvasEl, 'data-camera-position', [2.0, 1.6, 2.0]);
-  const [lookAtX, lookAtY, lookAtZ] = parseVector3Attr(canvasEl, 'data-camera-look-at', [0, 0.5, 0]);
+  // Camera attributes use ROS convention (X forward, Y left, Z up).
+  // Convert to Three.js world space: Three(x,y,z) = ROS(x_ros, z_ros, -y_ros)
+  const [ros_camX, ros_camY, ros_camZ] = parseVector3Attr(canvasEl, 'data-camera-position', [2.0, -2.0, 1.6]);
+  const [ros_lookX, ros_lookY, ros_lookZ] = parseVector3Attr(canvasEl, 'data-camera-look-at', [0, 0, 0.5]);
 
   const camera = new THREE.PerspectiveCamera(cameraFov, 1.0, cameraNear, cameraFar);
-  camera.position.set(cameraX, cameraY, cameraZ);
-  camera.lookAt(lookAtX, lookAtY, lookAtZ);
+  camera.position.set(ros_camX, ros_camZ, -ros_camY);
+  camera.lookAt(ros_lookX, ros_lookZ, -ros_lookY);
 
   const displayConfig = parse3DDisplayConfig(canvasEl);
   const topicConfig = parse3DTopicConfig(canvasEl, displayConfig);
@@ -329,8 +331,9 @@ const viewerWidgets = threeCanvases.map((canvasEl, widgetIndex) => {
   }
 
   const controls = new OrbitControls(camera, renderer.domElement);
-  const [targetX, targetY, targetZ] = parseVector3Attr(canvasEl, 'data-controls-target', [0, 0.4, 0]);
-  controls.target.set(targetX, targetY, targetZ);
+  // data-controls-target is in ROS convention (X forward, Y left, Z up)
+  const [ros_tgtX, ros_tgtY, ros_tgtZ] = parseVector3Attr(canvasEl, 'data-controls-target', [0, 0, 0.4]);
+  controls.target.set(ros_tgtX, ros_tgtZ, -ros_tgtY);
   controls.enableDamping = parseBoolAttr(canvasEl, 'data-controls-enable-damping', true);
   controls.dampingFactor = parseNumberAttr(canvasEl, 'data-controls-damping-factor', 0.06);
   controls.minDistance = parseNumberAttr(canvasEl, 'data-controls-min-distance', 0.1);

@@ -256,17 +256,7 @@
         MIN_SLIDESHOW_INTERVAL_MS,
         parseInt(cell.dataset.slideshowInterval, 10) || DEFAULT_SLIDESHOW_INTERVAL_MS,
       );
-      let   current = 0;
-      let transitionResetFrame = null;
-
-      function cancelTransitionReset() {
-        if (transitionResetFrame !== null) {
-          cancelAnimationFrame(transitionResetFrame);
-          transitionResetFrame = null;
-        }
-      }
-
-      // Build progress dots
+      // Build progress dots (before cloning so dots only cover real slides)
       const dots = slides.map((slide, i) => {
         const d = document.createElement('span');
         d.className = 'slideshow-dot' + (i === 0 ? ' active' : '');
@@ -274,30 +264,47 @@
         return d;
       });
 
-      function goTo(idx) {
-        cancelTransitionReset();
-        current = ((idx % slides.length) + slides.length) % slides.length;
-        const wrapped = idx >= slides.length || idx < 0;
-        if (wrapped) {
-          track.style.transition = 'none';
-        } else {
-          track.style.transition = '';
-        }
-        track.style.transform = `translateX(-${current * 100}%)`;
-        dots.forEach(function (d, i) { d.classList.toggle('active', i === current); });
-        const label = slides[current].dataset.slideTitle || '';
+      // Append a clone of slide 0 so the wrap-around animates forward like any step
+      track.appendChild(slides[0].cloneNode(true));
+
+      let slot = 0;       // current track slot: 0..slides.length (last = clone of slide 0)
+      let snapping = false;
+
+      const updateMeta = (logicalIdx) => {
+        dots.forEach((d, i) => d.classList.toggle('active', i === logicalIdx));
+        const label = slides[logicalIdx].dataset.slideTitle || '';
         if (titleEl && label) titleEl.textContent = label;
+      };
 
-        if (wrapped) {
-          transitionResetFrame = requestAnimationFrame(function () {
-            track.style.transition = '';
-            transitionResetFrame = null;
-          });
+      const jumpTo = (s) => {
+        // Instant jump with no animation (disable transition, move, force reflow, re-enable)
+        track.style.transition = 'none';
+        track.style.transform = `translateX(-${s * 100}%)`;
+        void track.offsetWidth; // flush paint so the above takes effect before transition restores
+        track.style.transition = '';
+        slot = s;
+        updateMeta(s % slides.length);
+      };
+
+      const advance = () => {
+        if (snapping) return;
+        const next = slot + 1;
+        track.style.transform = `translateX(-${next * 100}%)`;
+        slot = next;
+        updateMeta(next % slides.length);
+
+        if (next === slides.length) {
+          // Just moved to the clone of slide 0; after the animation silently jump back to real slide 0
+          snapping = true;
+          track.addEventListener('transitionend', () => {
+            jumpTo(0);
+            snapping = false;
+          }, { once: true });
         }
-      }
+      };
 
-      goTo(0);
-      setInterval(function () { goTo(current + 1); }, ms);
+      jumpTo(0);
+      setInterval(advance, ms);
     }
   }());
   </script>

@@ -289,7 +289,7 @@ scene.add(rosSceneRoot);
 // Camera, renderer and controls per canvas widget
 // ─────────────────────────────────────────────────────────────────────────────
 
-const viewerWidgets = threeCanvases.map((canvasEl) => {
+const viewerWidgets = threeCanvases.map((canvasEl, widgetIndex) => {
   const renderer = new THREE.WebGLRenderer({
     canvas: canvasEl,
     antialias: true,
@@ -320,9 +320,7 @@ const viewerWidgets = threeCanvases.map((canvasEl) => {
   camera.layers.enable(VIEW_LAYERS.BASE);
   if (displayConfig.showUrdf) camera.layers.enable(VIEW_LAYERS.URDF);
   if (displayConfig.showPointCloud) {
-    for (const topic of topicConfig.pointCloudTopics) {
-      camera.layers.enable(getTopicLayer('pointcloud', topic));
-    }
+    camera.layers.enable(getTopicLayer('pointcloud', `__widget__:${widgetIndex}`));
   }
   if (displayConfig.showMarkers) {
     for (const topic of topicConfig.markerArrayTopics) {
@@ -348,6 +346,22 @@ const viewerWidgets = threeCanvases.map((canvasEl) => {
   const fpsThrottleHz = Math.max(1, fpsThrottleRaw);
   const frameIntervalMs = 1000 / fpsThrottleHz;
 
+  let pointCloudEntry = null;
+  if (displayConfig.showPointCloud) {
+    const widgetLayer = getTopicLayer('pointcloud', `__widget__:${widgetIndex}`);
+    const positions = new Float32Array(MAX_CLOUD_PTS * 3);
+    const colors = new Float32Array(MAX_CLOUD_PTS * 3);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('aColor', new THREE.BufferAttribute(colors, 3));
+    geometry.setDrawRange(0, 0);
+    const points = new THREE.Points(geometry, createPointCloudMaterial());
+    points.frustumCulled = false;
+    setObjectLayerRecursive(points, widgetLayer);
+    rosSceneRoot.add(points);
+    pointCloudEntry = { points, geometry, positions, colors, frameId: '', topic: '' };
+  }
+
   return {
     canvasEl,
     renderer,
@@ -358,6 +372,7 @@ const viewerWidgets = threeCanvases.map((canvasEl) => {
     urdfLinkFilters,
     fpsThrottleHz,
     frameIntervalMs,
+    pointCloudEntry,
   };
 });
 
@@ -407,8 +422,6 @@ enableLightOnAllLayers(hemiLight);
 // Point Cloud — custom GLSL shader
 // ─────────────────────────────────────────────────────────────────────────────
 
-const pointCloudByTopic = new Map();
-
 function createPointCloudMaterial() {
   return new THREE.ShaderMaterial({
     vertexShader: /* glsl */`
@@ -453,27 +466,7 @@ function createPointCloudMaterial() {
   });
 }
 
-function getOrCreatePointCloudEntry(topicName) {
-  const topic = String(topicName || '').trim() || '<unknown>';
-  const existing = pointCloudByTopic.get(topic);
-  if (existing) return existing;
 
-  const positions = new Float32Array(MAX_CLOUD_PTS * 3);
-  const colors = new Float32Array(MAX_CLOUD_PTS * 3);
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute('aColor', new THREE.BufferAttribute(colors, 3));
-  geometry.setDrawRange(0, 0);
-
-  const points = new THREE.Points(geometry, createPointCloudMaterial());
-  points.frustumCulled = false;
-  setObjectLayerRecursive(points, getTopicLayer('pointcloud', topic));
-  rosSceneRoot.add(points);
-
-  const entry = { topic, points, geometry, positions, colors, frameId: '' };
-  pointCloudByTopic.set(topic, entry);
-  return entry;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Viridis colourmap (JS-side, for any unmapped points)
@@ -488,9 +481,13 @@ function viridis(t) {
   return [Math.max(0, Math.min(1, r)), Math.max(0, Math.min(1, g)), Math.max(0, Math.min(1, b))];
 }
 
-// Decode base64 → Float32Array, fill buffers
+// Decode base64 → Float32Array, update all widgets subscribed to this topic
 function updatePointCloud(topic, b64, count, frameId) {
-  const entry = getOrCreatePointCloudEntry(topic);
+  const relevantWidgets = viewerWidgets.filter(
+    (w) => w.pointCloudEntry && w.topicConfig.pointCloudTopics.includes(topic),
+  );
+  if (relevantWidgets.length === 0) return;
+
   const binary = atob(b64);
   const buf    = new ArrayBuffer(binary.length);
   const bytes  = new Uint8Array(buf);
@@ -505,40 +502,45 @@ function updatePointCloud(topic, b64, count, frameId) {
     if (isFinite(z)) { zMin = Math.min(zMin, z); zMax = Math.max(zMax, z); }
   }
   const zRange = (zMax - zMin) > 1e-6 ? (zMax - zMin) : 1;
+  const normalizedFrameId = normalizeFrameId(frameId);
 
-  for (let i = 0; i < n; i++) {
-    const fi = i * 6;
-    entry.positions[i * 3]     = f[fi];
-    entry.positions[i * 3 + 1] = f[fi + 1];
-    entry.positions[i * 3 + 2] = f[fi + 2];
+  for (const widget of relevantWidgets) {
+    const entry = widget.pointCloudEntry;
+    for (let i = 0; i < n; i++) {
+      const fi = i * 6;
+      entry.positions[i * 3]     = f[fi];
+      entry.positions[i * 3 + 1] = f[fi + 1];
+      entry.positions[i * 3 + 2] = f[fi + 2];
 
-    let r = f[fi + 3], g = f[fi + 4], b = f[fi + 5];
-    if (!isFinite(r) || r < 0) {
-      // Fallback height colourmap
-      [r, g, b] = viridis((f[fi + 2] - zMin) / zRange);
+      let r = f[fi + 3], g = f[fi + 4], b = f[fi + 5];
+      if (!isFinite(r) || r < 0) {
+        // Fallback height colourmap
+        [r, g, b] = viridis((f[fi + 2] - zMin) / zRange);
+      }
+      entry.colors[i * 3]     = r;
+      entry.colors[i * 3 + 1] = g;
+      entry.colors[i * 3 + 2] = b;
     }
-    entry.colors[i * 3]     = r;
-    entry.colors[i * 3 + 1] = g;
-    entry.colors[i * 3 + 2] = b;
+
+    entry.geometry.setDrawRange(0, n);
+    entry.geometry.attributes.position.needsUpdate = true;
+    entry.geometry.attributes.aColor.needsUpdate   = true;
+    entry.frameId = normalizedFrameId;
+    entry.topic = topic;
+    updatePointCloudPoseFromTF(entry);
   }
-
-  entry.geometry.setDrawRange(0, n);
-  entry.geometry.attributes.position.needsUpdate = true;
-  entry.geometry.attributes.aColor.needsUpdate   = true;
-
-  entry.frameId = normalizeFrameId(frameId);
-  updatePointCloudPoseFromTF(entry);
 }
 
 function updatePointCloudPoseFromTF(entry) {
-  const frameMat = getFrameMatrixInFixedFrame(entry.frameId, `pointcloud:${entry.topic}`);
+  const label = entry.topic || '<unknown>';
+  const frameMat = getFrameMatrixInFixedFrame(entry.frameId, `pointcloud:${label}`);
   if (frameMat) {
-    clearTfWarning(`pointcloud-fallback:${entry.topic}:${entry.frameId || 'empty'}`);
+    clearTfWarning(`pointcloud-fallback:${label}:${entry.frameId || 'empty'}`);
     frameMat.decompose(entry.points.position, entry.points.quaternion, entry.points.scale);
   } else {
     warnTfOnce(
-      `pointcloud-fallback:${entry.topic}:${entry.frameId || 'empty'}`,
-      `[TF] Point cloud topic "${entry.topic}" pose fallback to identity because transform lookup failed for frame "${entry.frameId || '<empty>'}"`,
+      `pointcloud-fallback:${label}:${entry.frameId || 'empty'}`,
+      `[TF] Point cloud topic "${label}" pose fallback to identity because transform lookup failed for frame "${entry.frameId || '<empty>'}"`,
     );
     entry.points.position.set(0, 0, 0);
     entry.points.quaternion.identity();
@@ -547,8 +549,10 @@ function updatePointCloudPoseFromTF(entry) {
 }
 
 function updateAllPointCloudPosesFromTF() {
-  for (const entry of pointCloudByTopic.values()) {
-    updatePointCloudPoseFromTF(entry);
+  for (const widget of viewerWidgets) {
+    if (widget.pointCloudEntry) {
+      updatePointCloudPoseFromTF(widget.pointCloudEntry);
+    }
   }
 }
 

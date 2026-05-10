@@ -1324,12 +1324,19 @@ function updateMarkerPosesFromTF() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 let ws = null;
+let wsEverConnected = false;
 
 function connectWS() {
   ws = new WebSocket(WS_URL);
 
   ws.onopen = () => {
     setWsStatus(true);
+    if (wsEverConnected) {
+      console.log('[WS] Reconnected — reloading page in 3 s');
+      setTimeout(() => location.reload(), 3_000);
+      return;
+    }
+    wsEverConnected = true;
     console.log('[WS] Connected');
   };
 

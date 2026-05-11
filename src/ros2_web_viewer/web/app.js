@@ -1411,12 +1411,14 @@ const imagePanelWidgets = Array.from(document.querySelectorAll('[data-ros-widget
     const placeholderEl = panel.querySelector('#image-placeholder, [data-role="image-placeholder"]');
     const topicEl = panel.querySelector('#image-topic-label, [data-role="image-topic-label"]');
     if (!imageEl || !placeholderEl || !topicEl) return null;
+    const topicFilter = String(panel.getAttribute('data-topic') || '').trim();
+    if (!topicFilter.startsWith('/')) return null;
     return {
       panel,
       imageEl,
       placeholderEl,
       topicEl,
-      topicFilter: String(panel.getAttribute('data-topic') || '').trim(),
+      topicFilter,
     };
   })
   .filter(Boolean);

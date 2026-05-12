@@ -67,6 +67,7 @@ setup(
     entry_points={
         'console_scripts': [
             'ros2_web_viewer = ros2_web_viewer.node:main',
+            'restart_service_node = ros2_web_viewer.restart_service_node:main',
             'list_urdf_links = ros2_web_viewer.list_urdf_links:main',
         ],
     },

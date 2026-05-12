@@ -109,6 +109,8 @@ For a complete, well-documented list of all parameters with explanations, see [c
 `data-ros-widget="image-panel"` widgets use `data-topic` for image subscriptions and are registered via `POST /api/register_viewer_topics`.
 
 Buttons using `<button data-trigger-service="/my_service">` call `std_srvs/Trigger` through `POST /api/trigger`.
+The default launch also starts `restart_service_node`, which serves `/restart_system`.
+That node is marked required (`on_exit=Shutdown(...)`), so calling `/restart_system` cleanly exits the full launch.
 
 Inputs/selects using `data-ros-param-node`, `data-ros-param-name`, `data-ros-param-type`, and
 `data-ros-param-default` are synced through `POST /api/parameter/sync` (default polling every 10s)

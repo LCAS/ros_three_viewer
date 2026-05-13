@@ -88,8 +88,8 @@
           data-pointcloud-topics="/partial_cloud"
           data-camera-position="2.0 0 0.7"
           data-camera-fov="30"
-          data-camera-look-at="0.15 0.5 0.2"
-          data-controls-target="0.15 0.5 0.2"
+          data-camera-look-at="-0.55, 0.1 0.2"
+          data-controls-target="-0.55, 0.1 0.2"
           data-fps-throttle="10"
           data-controls-enable-damping="true"
           data-controls-damping-factor="0.06"
@@ -253,7 +253,17 @@
       if (slides.length < 2) continue;
 
       const isSlideEligible = (slide) => {
-        if (slide.getAttribute('data-ros-widget') !== 'image-panel') return true;
+        const widgetType = slide.getAttribute('data-ros-widget');
+        if (widgetType === 'html-panel') {
+          const topic = String(slide.getAttribute('data-topic') || '').trim();
+          if (!topic.startsWith('/')) return true;
+          if (slide.dataset.hasHtmlData === 'true') return true;
+          const contentEl = slide.querySelector('[data-role="html-content"]');
+          const contentText = String(contentEl?.textContent || '').trim();
+          if (!contentText) return false;
+          return !/waiting\s+for\s+plant\s+trait\s+data/i.test(contentText);
+        }
+        if (widgetType !== 'image-panel') return true;
         const topic = String(slide.getAttribute('data-topic') || '').trim();
         if (!topic.startsWith('/')) return true;
         const imageEl = slide.querySelector('img');

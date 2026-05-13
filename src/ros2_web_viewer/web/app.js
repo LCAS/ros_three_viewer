@@ -1433,7 +1433,7 @@ const htmlPanelWidgets = Array.from(document.querySelectorAll('[data-ros-widget=
   .map((panel) => {
     const contentEl = panel.querySelector('[data-role="html-content"]');
     const topicEl = panel.querySelector('[data-role="html-topic-label"]');
-    if (!contentEl || !topicEl) return null;
+    if (!contentEl) return null;
     return {
       panel,
       contentEl,
@@ -1957,7 +1957,10 @@ function updateHtmlPanel(html, topic) {
       // Degraded fallback for browsers without Sanitizer API support.
       widget.contentEl.textContent = rawHtml;
     }
-    widget.topicEl.textContent = topic.split('/').pop();
+    widget.panel.dataset.hasHtmlData = 'true';
+    if (widget.topicEl) {
+      widget.topicEl.textContent = topic.split('/').pop();
+    }
   }
 }
 

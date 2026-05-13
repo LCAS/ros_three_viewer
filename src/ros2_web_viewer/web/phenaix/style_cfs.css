@@ -299,9 +299,9 @@ html, body {
 }
 
 /* RED EDGE panel: map bright tones to red while keeping dark tones dark */
-.widget-slideshow .slide[data-topic="/micasense/images/red_edge"] img {
+/* .widget-slideshow .slide[data-topic="/micasense/images/red_edge"] img {
   filter: grayscale(1) sepia(1) hue-rotate(-48deg) saturate(10) contrast(1.15);
-}
+} */
 
 .widget-slideshow .slide [data-role="image-placeholder"]:not(.panel-description) {
   flex: 1;

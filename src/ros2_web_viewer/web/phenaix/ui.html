@@ -24,7 +24,7 @@
           <span>&#x25CF;&nbsp;COLOUR FEED</span>
           <span data-role="image-topic-label">—</span>
         </div>
-        <p class="panel-description">What is the robot seeing? This is what the robot&#8217;s <b>colour</b> (<b style="color:rgb(200,0,0)">R</b>ed, <b style="color:rgb(0,200,0)">G</b>reen, <b style="color:rgb(0,0,200)">B</b>lue) and <b style="color:rgb(48,40,30)">D</b><b>epth</b> cameras are capturing, 30 times per second.</p>
+        <p class="panel-description">The robot&#8217;s <b>camera</b> captures <b>colour</b> (<b style="color:rgb(200,0,0)">R</b>ed, <b style="color:rgb(0,200,0)">G</b>reen, <b style="color:rgb(0,0,200)">B</b>lue) and <b style="color:rgb(48,40,30)">D</b><b>epth</b> images, repeating 30 times per second.</p>
         <img alt="colour feed" style="display:none" />
         <div data-role="image-placeholder">AWAITING DATA</div>
       </div>
@@ -39,21 +39,21 @@
           <div class="slideshow-track">
 
             <div class="slide" data-ros-widget="image-panel" data-topic="/leaf_count/annotated_image" data-slide-title="LEAF COUNT">
-              <p class="panel-description">An AI model -- trained by a scientist -- detects and counts individual leaves found within each image of the plant, helping track plant growth.</p>
+              <p class="panel-description">An <b>AI model</b> -- trained by a scientist -- detects and counts leaves within each plant image, helping track plant growth.</p>
               <img alt="leaf count" style="display:none" />
               <div data-role="image-placeholder">AWAITING DATA</div>
               <span data-role="image-topic-label" style="display:none">—</span>
             </div>
 
             <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/red_edge" data-slide-title="RED EDGE">
-              <p class="panel-description">Red-Edge analysis highlights unhealthy amounts of chlorophyll, an early indicator of plant stress, by combining light wavelengths.</p>
+              <p class="panel-description"><b>Red-Edge</b> analysis highlights unhealthy amounts of chlorophyll, an early indicator of plant stress.</p>
               <img alt="red edge band" style="display:none" />
               <div data-role="image-placeholder">AWAITING DATA</div>
               <span data-role="image-topic-label" style="display:none">—</span>
             </div>
 
             <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/nir" data-slide-title="NIR">
-              <p class="panel-description">Near-Infrared light spans wavelengths that are invisible to the naked (human) eye, but strongly reflected by healthy green leaves.</p>
+              <p class="panel-description"><b>Near-Infrared (NIR)</b> light spans wavelengths invisible to the naked eye, but are reflected by healthy green leaves.</p>
               <img alt="nir feed" style="display:none" />
               <div data-role="image-placeholder">AWAITING DATA</div>
               <span data-role="image-topic-label" style="display:none">—</span>
@@ -69,7 +69,7 @@
           <span>&#x25CF;&nbsp;NDVI</span>
           <span data-role="image-topic-label">—</span>
         </div>
-        <p class="panel-description">NDVI analysis maps vegetation health by comparing reflectances: <b style="color:rgb(0,200,0)">green</b> indicates thriving plants; <b style="color:rgb(200,0,0)">red</b> suggests stress or soil.</p>
+        <p class="panel-description"><b>NDVI</b> analysis maps vegetation health by comparing reflectances: <b style="color:rgb(0,200,0)">green</b> indicates thriving plants; <b style="color:rgb(200,0,0)">red</b> suggests stress.</p>
         <img alt="ndvi feed" style="display:none" />
         <div data-role="image-placeholder">AWAITING DATA</div>
       </div>
@@ -79,7 +79,7 @@
         <div class="widget-header">
           <span>&#x25CF;&nbsp;ROBOT-AIDED MODELLING</span>
         </div>
-        <p class="panel-description">The robot system uses AI to plan its motions (arm&amp;camera), as well as the plant pedestal, to construct a live 3D model of what it sees.</p>
+        <p class="panel-description"><b>PhenAIx</b> uses AI to plan robot and plant pedestal motions, constructing a live 3D model of what it sees.</p>
         <canvas
           class="ros-viewer-canvas"
           data-ros-widget="3d"
@@ -162,7 +162,7 @@
 
       <div class="slide" data-ros-widget="static-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
               <img src="team_images/Ollie.png" alt="ollie" />
-              <p class="panel-description" data-role="image-placeholder">Ollie is a postdoctoral research in Robotics.</p>
+              <p class="panel-description" data-role="image-placeholder">Ollie is a postdoctoral research associate in Robotics.</p>
               <span data-role="image-topic-label" style="display:none">—</span>
             </div>
 
@@ -178,21 +178,21 @@
               <span data-role="image-topic-label" style="display:none">—</span>
             </div>
 
-      <div class="slide" data-ros-widget="static-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
-              <img src="team_images/SP1.png" alt="sp1" />
-              <p class="panel-description" data-role="image-placeholder">Simon (1) is a professor in agricutural engineering. He is the Founding Director of the Lincoln Institute for Agri-food Technology (LIAT).</p>
+	    <div class="slide" data-ros-widget="image-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/SP2.png" alt="sp2" />
+              <p class="panel-description" data-role="image-placeholder">Simon Pa is a professor in AI and machine learning. He is Director of SUSTAIN and Research Director of LIAT.</p>
               <span data-role="image-topic-label" style="display:none">—</span>
             </div>
 
-      <div class="slide" data-ros-widget="static-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
-              <img src="team_images/SP2.png" alt="sp2" />
-              <p class="panel-description" data-role="image-placeholder">Simon (2) is a professor in AI and machine learning. He is Director of SUSTAIN and Research Director of LIAT.</p>
+	    <div class="slide" data-ros-widget="image-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/SP1.png" alt="sp1" />
+              <p class="panel-description" data-role="image-placeholder">Simon Pe is a professor in agricutural engineering. He is the Founding Director of the Lincoln Institute for Agri-food Technology (LIAT).</p>
               <span data-role="image-topic-label" style="display:none">—</span>
             </div>
 
       <div class="slide" data-ros-widget="static-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
               <img src="team_images/Yoon.png" alt="yoon" />
-              <p class="panel-description" data-role="image-placeholder">YOON</p>
+              <p class="panel-description" data-role="image-placeholder">Yoon is a postdoctoral research associate in crop physiology.</p>
               <span data-role="image-topic-label" style="display:none">—</span>
             </div>
 

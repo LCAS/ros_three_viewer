@@ -12,7 +12,7 @@
     fixed_frame: "base_link"        # TF frame used as world origin (RViz-style)
     target_frame: "base_link"       # Fallback TF frame (used if fixed_frame not set)
 
-    html_routes: "{'/': 'phenaix/ui.html', '/phenaix_ui': 'phenaix/ui.html', '/phenaix_controller': 'phenaix/controller.html', '/modular': 'examples/modular.html'}"  # Route->html path mapping (relative to web/, absolute, or use @package_name@ substitution)
+    html_routes: "{'/': 'phenaix/ui.html', '/full': 'phenaix/ui_full.html', '/phenaix_controller': 'phenaix/controller.html'}"  # Route->html path mapping (relative to web/, absolute, or use @package_name@ substitution)
     
 
     # ────────────────────────────────────────────────────────────────────────────
@@ -29,7 +29,7 @@
     joint_states_broadcast_hz: 5.0  # Joint state websocket broadcast rate (<=0 disables throttling)
     tf_broadcast_hz: 5.0            # Dynamic TF websocket broadcast rate (<=0 disables throttling)
     image_broadcast_hz: 2.0         # Default image topic websocket broadcast rate (<=0 disables throttling)
-    pointcloud_broadcast_hz: 1.0    # Default point cloud topic websocket broadcast rate (<=0 disables throttling)
+    pointcloud_broadcast_hz: 0.0    # Default point cloud topic websocket broadcast rate (<=0 disables throttling)
     image_topic_broadcast_hz: "{}"       # Optional per-topic image rates as JSON/Python dict, e.g. {'/cam/front': 2.0}
     pointcloud_topic_broadcast_hz: "{}"  # Optional per-topic point cloud rates as JSON/Python dict, e.g. {'/points': 0.5}
     pointcloud_max_points: 400000   # Maximum points per cloud (heavier clouds are downsampled)

@@ -1489,7 +1489,9 @@ const panelSanitizerConfig = {
     placeholder: ['input'],
     disabled: ['button', 'input', 'select', 'option'],
     'data-trigger-service': ['button'],
+    'data-trigger-confirm': ['button'],
     'data-trigger-timeout': ['button'],
+    'data-trigger-cooldown': ['button'],
     'data-ros-param-node': ['input', 'select'],
     'data-ros-param-name': ['input', 'select'],
     'data-ros-param-type': ['input', 'select'],
@@ -1516,6 +1518,7 @@ function normalizePanelLinks(root) {
 
 let _triggerToastTimer = null;
 let _triggerToastCountTimer = null;
+let _triggerConfirmDialog = null;
 
 function showTriggerToast(label, cooldownMs) {
   let toast = document.getElementById('trigger-toast');
@@ -1554,6 +1557,133 @@ function showTriggerToast(label, cooldownMs) {
   }, cooldownMs);
 }
 
+function getDefaultDangerousTriggerMessage(service) {
+  const normalized = String(service || '').trim().toLowerCase();
+  if (!normalized) return '';
+  if (
+    normalized.includes('restart')
+    || normalized.includes('shutdown')
+    || normalized.includes('reboot')
+    || normalized.includes('poweroff')
+  ) {
+    return 'This action will stop the running system. Continue?';
+  }
+  return '';
+}
+
+function ensureTriggerConfirmDialog() {
+  if (_triggerConfirmDialog) return _triggerConfirmDialog;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'trigger-confirm-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.style.position = 'fixed';
+  overlay.style.inset = '0';
+  overlay.style.display = 'none';
+  overlay.style.alignItems = 'center';
+  overlay.style.justifyContent = 'center';
+  overlay.style.background = 'rgba(0, 0, 0, 0.55)';
+  overlay.style.zIndex = '9999';
+
+  const panel = document.createElement('div');
+  panel.style.width = 'min(92vw, 480px)';
+  panel.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+  panel.style.borderRadius = '12px';
+  panel.style.padding = '18px';
+  panel.style.background = '#20262c';
+  panel.style.color = '#f2efe4';
+  panel.style.boxShadow = '0 18px 42px rgba(0, 0, 0, 0.35)';
+
+  const messageEl = document.createElement('p');
+  messageEl.id = 'trigger-confirm-message';
+  messageEl.style.margin = '0 0 14px 0';
+  messageEl.style.lineHeight = '1.4';
+
+  const actions = document.createElement('div');
+  actions.style.display = 'flex';
+  actions.style.gap = '10px';
+  actions.style.justifyContent = 'flex-end';
+
+  const cancelButton = document.createElement('button');
+  cancelButton.type = 'button';
+  cancelButton.textContent = 'Cancel';
+  cancelButton.style.padding = '8px 14px';
+  cancelButton.style.borderRadius = '8px';
+  cancelButton.style.border = '1px solid rgba(255, 255, 255, 0.35)';
+  cancelButton.style.background = 'transparent';
+  cancelButton.style.color = 'inherit';
+  cancelButton.style.cursor = 'pointer';
+
+  const confirmButton = document.createElement('button');
+  confirmButton.type = 'button';
+  confirmButton.textContent = 'Confirm';
+  confirmButton.style.padding = '8px 14px';
+  confirmButton.style.borderRadius = '8px';
+  confirmButton.style.border = '1px solid rgba(255, 255, 255, 0.25)';
+  confirmButton.style.background = '#c0654a';
+  confirmButton.style.color = '#fff';
+  confirmButton.style.cursor = 'pointer';
+
+  actions.append(cancelButton, confirmButton);
+  panel.append(messageEl, actions);
+  overlay.append(panel);
+  document.body.appendChild(overlay);
+
+  _triggerConfirmDialog = {
+    overlay,
+    panel,
+    messageEl,
+    cancelButton,
+    confirmButton,
+  };
+  return _triggerConfirmDialog;
+}
+
+function requestTriggerConfirmation(message) {
+  const text = String(message || '').trim();
+  if (!text) return Promise.resolve(true);
+
+  const dialog = ensureTriggerConfirmDialog();
+  dialog.messageEl.textContent = text;
+  dialog.overlay.style.display = 'flex';
+
+  return new Promise((resolve) => {
+    let done = false;
+
+    const finish = (accepted) => {
+      if (done) return;
+      done = true;
+      dialog.overlay.style.display = 'none';
+      dialog.cancelButton.removeEventListener('click', onCancel);
+      dialog.confirmButton.removeEventListener('click', onConfirm);
+      dialog.overlay.removeEventListener('click', onOverlay);
+      document.removeEventListener('keydown', onKeyDown);
+      resolve(accepted);
+    };
+
+    const onCancel = () => finish(false);
+    const onConfirm = () => finish(true);
+    const onOverlay = (event) => {
+      if (event.target === dialog.overlay) {
+        finish(false);
+      }
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        finish(false);
+      }
+    };
+
+    dialog.cancelButton.addEventListener('click', onCancel);
+    dialog.confirmButton.addEventListener('click', onConfirm);
+    dialog.overlay.addEventListener('click', onOverlay);
+    document.addEventListener('keydown', onKeyDown);
+    dialog.confirmButton.focus();
+  });
+}
+
 // ── Trigger button binding ────────────────────────────────────────────────────
 
 function bindTriggerButtons(root) {
@@ -1564,8 +1694,10 @@ function bindTriggerButtons(root) {
       evt.preventDefault();
       const service = String(button.getAttribute('data-trigger-service') || '').trim();
       if (!service) return;
-      const confirmMessage = String(button.getAttribute('data-trigger-confirm') || '').trim();
-      if (confirmMessage && !window.confirm(confirmMessage)) {
+      const confirmMessage = String(button.getAttribute('data-trigger-confirm') || '').trim()
+        || getDefaultDangerousTriggerMessage(service);
+      const confirmed = await requestTriggerConfirmation(confirmMessage);
+      if (!confirmed) {
         return;
       }
 

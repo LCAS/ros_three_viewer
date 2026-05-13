@@ -252,6 +252,30 @@
       const slides  = Array.from(track.children);
       if (slides.length < 2) continue;
 
+      const isSlideEligible = (slide) => {
+        if (slide.getAttribute('data-ros-widget') !== 'image-panel') return true;
+        const topic = String(slide.getAttribute('data-topic') || '').trim();
+        if (!topic.startsWith('/')) return true;
+        const imageEl = slide.querySelector('img');
+        return Boolean(imageEl && imageEl.getAttribute('src'));
+      };
+
+      const findNextEligibleIndex = (fromIdx) => {
+        const total = slides.length;
+        for (let offset = 1; offset <= total; offset += 1) {
+          const candidate = (fromIdx + offset) % total;
+          if (isSlideEligible(slides[candidate])) return candidate;
+        }
+        return fromIdx;
+      };
+
+      const findFirstEligibleIndex = () => {
+        for (let i = 0; i < slides.length; i += 1) {
+          if (isSlideEligible(slides[i])) return i;
+        }
+        return 0;
+      };
+
       const ms      = Math.max(
         MIN_SLIDESHOW_INTERVAL_MS,
         parseInt(cell.dataset.slideshowInterval, 10) || DEFAULT_SLIDESHOW_INTERVAL_MS,
@@ -264,11 +288,7 @@
         return d;
       });
 
-      // Append a clone of slide 0 so the wrap-around animates forward like any step
-      track.appendChild(slides[0].cloneNode(true));
-
-      let slot = 0;       // current track slot: 0..slides.length (last = clone of slide 0)
-      let snapping = false;
+      let slot = 0;
 
       const updateMeta = (logicalIdx) => {
         dots.forEach((d, i) => d.classList.toggle('active', i === logicalIdx));
@@ -283,27 +303,18 @@
         void track.offsetWidth; // flush paint so the above takes effect before transition restores
         track.style.transition = '';
         slot = s;
-        updateMeta(s % slides.length);
+        updateMeta(s);
       };
 
       const advance = () => {
-        if (snapping) return;
-        const next = slot + 1;
+        const next = findNextEligibleIndex(slot);
+        if (next === slot) return;
         track.style.transform = `translateX(-${next * 100}%)`;
         slot = next;
-        updateMeta(next % slides.length);
-
-        if (next === slides.length) {
-          // Just moved to the clone of slide 0; after the animation silently jump back to real slide 0
-          snapping = true;
-          track.addEventListener('transitionend', () => {
-            jumpTo(0);
-            snapping = false;
-          }, { once: true });
-        }
+        updateMeta(next);
       };
 
-      jumpTo(0);
+      jumpTo(findFirstEligibleIndex());
       setInterval(advance, ms);
     }
   }());

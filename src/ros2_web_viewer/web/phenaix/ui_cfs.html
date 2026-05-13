@@ -67,7 +67,7 @@
       </div>
 
       <!-- Row 1, Col 2: spectral traits slideshow -->
-      <div class="grid-cell widget-slideshow" data-slideshow-interval="1000">
+      <div class="grid-cell widget-slideshow" data-slideshow-interval="10000">
         <div class="widget-header">
           <span>&#x25CF;&nbsp;<span data-role="slideshow-title">INVISIBLE TRAITS</span></span>
           <div class="slideshow-dots"></div>
@@ -211,6 +211,8 @@
         });
 
         let slot = 0;
+        let wrapClone = null;
+        let snapping = false;
 
         const updateMeta = (logicalIdx) => {
           dots.forEach((d, i) => d.classList.toggle('active', i === logicalIdx));
@@ -228,12 +230,45 @@
           updateMeta(s);
         };
 
+        const removeWrapClone = () => {
+          if (!wrapClone) return;
+          if (wrapClone.parentNode === track) {
+            track.removeChild(wrapClone);
+          }
+          wrapClone = null;
+        };
+
         const advance = () => {
+          if (snapping) return;
           const next = findNextEligibleIndex(slot);
           if (next === slot) return;
-          track.style.transform = `translateX(-${next * 100}%)`;
-          slot = next;
+
+          const wrapsForward = next <= slot;
+          if (!wrapsForward) {
+            track.style.transform = `translateX(-${next * 100}%)`;
+            slot = next;
+            updateMeta(next);
+            return;
+          }
+
+          removeWrapClone();
+          wrapClone = slides[next].cloneNode(true);
+          track.appendChild(wrapClone);
+
+          const virtualNext = slides.length;
+          track.style.transform = `translateX(-${virtualNext * 100}%)`;
           updateMeta(next);
+
+          snapping = true;
+          track.addEventListener('transitionend', () => {
+            track.style.transition = 'none';
+            removeWrapClone();
+            track.style.transform = `translateX(-${next * 100}%)`;
+            void track.offsetWidth;
+            track.style.transition = '';
+            slot = next;
+            snapping = false;
+          }, { once: true });
         };
 
         jumpTo(findFirstEligibleIndex());

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -14,62 +15,59 @@
   }
   </script>
 </head>
+
 <body>
   <div id="app-layout">
     <div id="app-grid">
 
       <!-- Row 1, Col 1: architectural traits slideshow -->
-      <div class="grid-cell widget-slideshow" data-slideshow-interval="4000">
+      <div class="grid-cell widget-slideshow" data-slideshow-interval="12000">
 
         <div class="widget-header">
           <span>&#x25CF;&nbsp;<span data-role="slideshow-title">VISIBLE TRAITS</span></span>
-	  <div class="slideshow-dots"></div>
-	</div>
-	<div class="slideshow-viewport">
-	  <div class="slideshow-track">
+          <div class="slideshow-dots"></div>
+        </div>
+        <div class="slideshow-viewport">
+          <div class="slideshow-track">
 
-	    <div class="slide" data-ros-widget="image-panel" data-topic="/camera/color/image_raw" data-slide-title="VISIBLE TRAITS: COLOUR IMAGES">
-              <p class="panel-description">What is the robot seeing? This is what the robot&#8217;s <b>colour</b> (<b style="color:rgb(200,0,0)">R</b>ed, <b style="color:rgb(0,200,0)">G</b>reen, <b style="color:rgb(0,0,200)">B</b>lue) and <b style="color:rgb(48,40,30)">D</b><b>epth</b> <b>cameras</b> are capturing, 30 times per second.</p>
+            <div class="slide" data-ros-widget="image-panel" data-topic="/camera/color/image_raw"
+              data-slide-title="VISIBLE TRAITS: COLOUR IMAGES">
+              <p class="panel-description">What is the robot seeing? This is what the robot&#8217;s <b>colour</b> (<b
+                  style="color:rgb(200,0,0)">R</b>ed, <b style="color:rgb(0,200,0)">G</b>reen, <b
+                  style="color:rgb(0,0,200)">B</b>lue) and <b style="color:rgb(48,40,30)">D</b><b>epth</b>
+                <b>cameras</b> are capturing, 30 times per second.</p>
               <img alt="colour feed" style="display:none" />
               <div data-role="image-placeholder">AWAITING DATA</div>
-	      <span data-role="image-topic-label" style="display:none">-</span>
-	    </div>
+              <span data-role="image-topic-label" style="display:none">-</span>
+            </div>
 
-      <div class="slide widget-3d" data-slide-title="VISIBLE TRAITS: LIVE MODEL">
-              <p class="panel-description">The <b>robot system</b> uses AI to plan its motions (arm&amp;camera), as well as the plant pedestal, to construct a live 3D model of what it sees.</p>
-              <canvas
-                class="ros-viewer-canvas"
-                data-ros-widget="3d"
-                data-display="urdf pointcloud"
+            <div class="slide widget-3d" data-slide-title="VISIBLE TRAITS: LIVE MODEL">
+              <p class="panel-description">The <b>robot system</b> uses AI to plan its motions (arm&amp;camera), as well
+                as the plant pedestal, to construct a live 3D model of what it sees.</p>
+              <canvas class="ros-viewer-canvas" data-ros-widget="3d" data-display="urdf pointcloud"
                 data-urdf-link-whitelist="ground_plane base_link_inertia shoulder_link upper_arm_link forearm_link wrist_1_link wrist_2_link wrist_3_link micasense_body_link micasense_frame_5_link micasense_frame_4_link micasense_frame_1_link micasense_frame_3_link micasense_frame_2_link camera_link turntable_link"
-                data-pointcloud-topics="/partial_cloud"
-                data-camera-position="2.0 0 0.7"
-                data-camera-fov="30"
-                data-camera-look-at="0.15 0.5 0.2"
-                data-controls-target="0.15 0.5 0.2"
-                data-fps-throttle="10"
-                data-controls-enable-damping="true"
-                data-controls-damping-factor="0.06"
-                data-controls-min-distance="0.1"
-                data-controls-max-distance="20"
-                data-controls-auto-rotate="true"
-                data-controls-auto-rotate-speed="0.75">
+                data-pointcloud-topics="/partial_cloud" data-camera-position="2.0 0 0.7" data-camera-fov="30"
+                data-camera-look-at="-0.55, 0.1 0.2" data-controls-target="-0.55, 0.1 0.2" data-fps-throttle="10"
+                data-controls-enable-damping="true" data-controls-damping-factor="0.06" data-controls-min-distance="0.1"
+                data-controls-max-distance="20" data-controls-auto-rotate="true" data-controls-auto-rotate-speed="0.75">
               </canvas>
-	    </div>
+            </div>
 
-      <div class="slide" data-ros-widget="image-panel" data-topic="/leaf_count/annotated_image" data-slide-title="VISIBLE TRAITS: LEAF COUNT">
-        <p class="panel-description">An <b>AI model</b> -- trained by a scientist -- detects and counts individual leaves found within each image of the plant, helping track plant growth.</p>
-        <img alt="leaf count" style="display:none" />
-        <div data-role="image-placeholder">AWAITING DATA</div>
-        <span data-role="image-topic-label" style="display:none">—</span>
+            <div class="slide" data-ros-widget="image-panel" data-topic="/leaf_count/annotated_image"
+              data-slide-title="VISIBLE TRAITS: LEAF COUNT">
+              <p class="panel-description">An <b>AI model</b> -- trained by a scientist -- detects and counts individual
+                leaves found within each image of the plant, helping track plant growth.</p>
+              <img alt="leaf count" style="display:none" />
+              <div data-role="image-placeholder">AWAITING DATA</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+          </div>
+        </div>
       </div>
 
-	  </div>
-	</div>
-      </div>
-	
       <!-- Row 1, Col 2: spectral traits slideshow -->
-      <div class="grid-cell widget-slideshow" data-slideshow-interval="3000">
+      <div class="grid-cell widget-slideshow" data-slideshow-interval="10000">
         <div class="widget-header">
           <span>&#x25CF;&nbsp;<span data-role="slideshow-title">INVISIBLE TRAITS</span></span>
           <div class="slideshow-dots"></div>
@@ -77,22 +75,37 @@
         <div class="slideshow-viewport">
           <div class="slideshow-track">
 
-            <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/red_edge" data-slide-title="INVISIBLE TRAITS: RED EDGE">
-              <p class="panel-description"><b>Red-Edge</b> analysis highlights unhealthy amounts of chlorophyll, an early indicator of plant stress, by combining light wavelengths.</p>
+            <div class="slide" data-ros-widget="image-panel" data-topic="/camera/infra1/image_rect_raw"
+              data-slide-title="INVISIBLE TRAITS: INFRARED">
+              <!-- <p class="panel-description"><b>Infrared</b> analysis ...</p> -->
+              <img alt="infrared band" style="display:none" />
+              <div data-role="image-placeholder">AWAITING DATA</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+            <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/red_edge"
+              data-slide-title="INVISIBLE TRAITS: RED EDGE">
+              <p class="panel-description"><b>Red-Edge</b> analysis highlights unhealthy amounts of chlorophyll, an
+                early indicator of plant stress, by combining light wavelengths.</p>
               <img alt="red edge band" style="display:none" />
               <div data-role="image-placeholder">AWAITING DATA</div>
               <span data-role="image-topic-label" style="display:none">—</span>
             </div>
 
-            <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/nir" data-slide-title="INVISIBLE TRAITS: NIR">
-              <p class="panel-description"><b>Near-Infrared (NIR)</b> light spans wavelengths that are invisible to the naked (human) eye, but strongly reflected by healthy green leaves.</p>
+            <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/nir"
+              data-slide-title="INVISIBLE TRAITS: NIR">
+              <p class="panel-description"><b>Near-Infrared (NIR)</b> light spans wavelengths that are invisible to the
+                naked (human) eye, but strongly reflected by healthy green leaves.</p>
               <img alt="nir feed" style="display:none" />
               <div data-role="image-placeholder">AWAITING DATA</div>
               <span data-role="image-topic-label" style="display:none">—</span>
             </div>
 
-            <div class="slide" data-ros-widget="image-panel" data-topic="/traits/ndvi_image" data-slide-title="INVISIBLE TRAITS: NDVI">
-              <p class="panel-description"><b>NDVI</b> analysis maps vegetation health by comparing reflectances: <b style="color:rgb(0,200,0)">green</b> indicates thriving plants; <b style="color:rgb(200,0,0)">red</b> suggests stress or soil.</p>
+            <div class="slide" data-ros-widget="image-panel" data-topic="/traits/ndvi_image"
+              data-slide-title="INVISIBLE TRAITS: NDVI">
+              <p class="panel-description"><b>NDVI</b> analysis maps vegetation health by comparing reflectances: <b
+                  style="color:rgb(0,200,0)">green</b> indicates thriving plants; <b style="color:rgb(200,0,0)">red</b>
+                suggests stress or soil.</p>
               <img alt="ndvi feed" style="display:none" />
               <div data-role="image-placeholder">AWAITING DATA</div>
               <span data-role="image-topic-label" style="display:none">—</span>
@@ -120,96 +133,97 @@
   <div id="loading" style="display:none;"></div>
   <script type="module" src="/assets/app.js"></script>
   <script type="module">
-  (function () {
-    const descriptions = document.querySelectorAll('.panel-description');
-    descriptions.forEach(function (el) {
-      const text = el.textContent.trim();
-      if (!text) return;
-      el.setAttribute('title', text);
-    });
-  }());
-
-  // ── Slideshow controller ──────────────────────────────────────
-  (function () {
-    const MIN_SLIDESHOW_INTERVAL_MS = 1000;
-    const DEFAULT_SLIDESHOW_INTERVAL_MS = 10000;
-    const CELLS = document.querySelectorAll('.widget-slideshow[data-slideshow-interval]');
-
-    for (const cell of CELLS) {
-      const track    = cell.querySelector('.slideshow-track');
-      const dotsWrap = cell.querySelector('.slideshow-dots');
-      const titleEl  = cell.querySelector('[data-role="slideshow-title"]');
-      if (!track) continue;
-
-      const slides  = Array.from(track.children);
-      if (slides.length < 2) continue;
-
-      const isSlideEligible = (slide) => {
-        if (slide.getAttribute('data-ros-widget') !== 'image-panel') return true;
-        const topic = String(slide.getAttribute('data-topic') || '').trim();
-        if (!topic.startsWith('/')) return true;
-        const imageEl = slide.querySelector('img');
-        return Boolean(imageEl && imageEl.getAttribute('src'));
-      };
-
-      const findNextEligibleIndex = (fromIdx) => {
-        const total = slides.length;
-        for (let offset = 1; offset <= total; offset += 1) {
-          const candidate = (fromIdx + offset) % total;
-          if (isSlideEligible(slides[candidate])) return candidate;
-        }
-        return fromIdx;
-      };
-
-      const findFirstEligibleIndex = () => {
-        for (let i = 0; i < slides.length; i += 1) {
-          if (isSlideEligible(slides[i])) return i;
-        }
-        return 0;
-      };
-
-      const ms      = Math.max(
-        MIN_SLIDESHOW_INTERVAL_MS,
-        parseInt(cell.dataset.slideshowInterval, 10) || DEFAULT_SLIDESHOW_INTERVAL_MS,
-      );
-      // Build progress dots (before cloning so dots only cover real slides)
-      const dots = slides.map((slide, i) => {
-        const d = document.createElement('span');
-        d.className = 'slideshow-dot' + (i === 0 ? ' active' : '');
-        if (dotsWrap) dotsWrap.appendChild(d);
-        return d;
+    (function () {
+      const descriptions = document.querySelectorAll('.panel-description');
+      descriptions.forEach(function (el) {
+        const text = el.textContent.trim();
+        if (!text) return;
+        el.setAttribute('title', text);
       });
+    }());
 
-      let slot = 0;
+    // ── Slideshow controller ──────────────────────────────────────
+    (function () {
+      const MIN_SLIDESHOW_INTERVAL_MS = 1000;
+      const DEFAULT_SLIDESHOW_INTERVAL_MS = 10000;
+      const CELLS = document.querySelectorAll('.widget-slideshow[data-slideshow-interval]');
 
-      const updateMeta = (logicalIdx) => {
-        dots.forEach((d, i) => d.classList.toggle('active', i === logicalIdx));
-        const label = slides[logicalIdx].dataset.slideTitle || '';
-        if (titleEl && label) titleEl.textContent = label;
-      };
+      for (const cell of CELLS) {
+        const track = cell.querySelector('.slideshow-track');
+        const dotsWrap = cell.querySelector('.slideshow-dots');
+        const titleEl = cell.querySelector('[data-role="slideshow-title"]');
+        if (!track) continue;
 
-      const jumpTo = (s) => {
-        // Instant jump with no animation (disable transition, move, force reflow, re-enable)
-        track.style.transition = 'none';
-        track.style.transform = `translateX(-${s * 100}%)`;
-        void track.offsetWidth; // flush paint so the above takes effect before transition restores
-        track.style.transition = '';
-        slot = s;
-        updateMeta(s);
-      };
+        const slides = Array.from(track.children);
+        if (slides.length < 2) continue;
 
-      const advance = () => {
-        const next = findNextEligibleIndex(slot);
-        if (next === slot) return;
-        track.style.transform = `translateX(-${next * 100}%)`;
-        slot = next;
-        updateMeta(next);
-      };
+        const isSlideEligible = (slide) => {
+          if (slide.getAttribute('data-ros-widget') !== 'image-panel') return true;
+          const topic = String(slide.getAttribute('data-topic') || '').trim();
+          if (!topic.startsWith('/')) return true;
+          const imageEl = slide.querySelector('img');
+          return Boolean(imageEl && imageEl.getAttribute('src'));
+        };
 
-      jumpTo(findFirstEligibleIndex());
-      setInterval(advance, ms);
-    }
-  }());
+        const findNextEligibleIndex = (fromIdx) => {
+          const total = slides.length;
+          for (let offset = 1; offset <= total; offset += 1) {
+            const candidate = (fromIdx + offset) % total;
+            if (isSlideEligible(slides[candidate])) return candidate;
+          }
+          return fromIdx;
+        };
+
+        const findFirstEligibleIndex = () => {
+          for (let i = 0; i < slides.length; i += 1) {
+            if (isSlideEligible(slides[i])) return i;
+          }
+          return 0;
+        };
+
+        const ms = Math.max(
+          MIN_SLIDESHOW_INTERVAL_MS,
+          parseInt(cell.dataset.slideshowInterval, 10) || DEFAULT_SLIDESHOW_INTERVAL_MS,
+        );
+        // Build progress dots (before cloning so dots only cover real slides)
+        const dots = slides.map((slide, i) => {
+          const d = document.createElement('span');
+          d.className = 'slideshow-dot' + (i === 0 ? ' active' : '');
+          if (dotsWrap) dotsWrap.appendChild(d);
+          return d;
+        });
+
+        let slot = 0;
+
+        const updateMeta = (logicalIdx) => {
+          dots.forEach((d, i) => d.classList.toggle('active', i === logicalIdx));
+          const label = slides[logicalIdx].dataset.slideTitle || '';
+          if (titleEl && label) titleEl.textContent = label;
+        };
+
+        const jumpTo = (s) => {
+          // Instant jump with no animation (disable transition, move, force reflow, re-enable)
+          track.style.transition = 'none';
+          track.style.transform = `translateX(-${s * 100}%)`;
+          void track.offsetWidth; // flush paint so the above takes effect before transition restores
+          track.style.transition = '';
+          slot = s;
+          updateMeta(s);
+        };
+
+        const advance = () => {
+          const next = findNextEligibleIndex(slot);
+          if (next === slot) return;
+          track.style.transform = `translateX(-${next * 100}%)`;
+          slot = next;
+          updateMeta(next);
+        };
+
+        jumpTo(findFirstEligibleIndex());
+        setInterval(advance, ms);
+      }
+    }());
   </script>
 </body>
+
 </html>

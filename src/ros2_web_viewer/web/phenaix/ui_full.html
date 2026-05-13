@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ROBO*CROPS : PhenAIx </title>
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three":         "/assets/vendor/three/three.module.js",
+      "three/addons/": "/assets/vendor/three/addons/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app-layout">
+    <div id="app-grid">
+
+      <!-- Row 1, Col 1: Live colour image -->
+      <div class="grid-cell widget-image" data-ros-widget="image-panel" data-topic="/capture/color/image_raw">
+        <div class="widget-header">
+          <span>&#x25CF;&nbsp;COLOUR FEED</span>
+          <span data-role="image-topic-label">—</span>
+        </div>
+        <p class="panel-description">The robot&#8217;s <b>camera</b> captures <b>colour</b> (<b style="color:rgb(200,0,0)">R</b>ed, <b style="color:rgb(0,200,0)">G</b>reen, <b style="color:rgb(0,0,200)">B</b>lue) and <b style="color:rgb(48,40,30)">D</b><b>epth</b> images, repeating 30 times per second.</p>
+        <img alt="colour feed" style="display:none" />
+        <div data-role="image-placeholder">AWAITING DATA</div>
+      </div>
+
+      <!-- Row 1, Col 2: MicaSense multispectral slideshow -->
+      <div class="grid-cell widget-slideshow" data-slideshow-interval="10000">
+        <div class="widget-header">
+          <span>&#x25CF;&nbsp;<span data-role="slideshow-title">MICASENSE</span></span>
+          <div class="slideshow-dots"></div>
+        </div>
+        <div class="slideshow-viewport">
+          <div class="slideshow-track">
+
+            <div class="slide" data-ros-widget="image-panel" data-topic="/leaf_count/annotated_image" data-slide-title="LEAF COUNT">
+              <p class="panel-description">An <b>AI model</b> -- trained by a scientist -- detects and counts leaves within each plant image, helping track plant growth.</p>
+              <img alt="leaf count" style="display:none" />
+              <div data-role="image-placeholder">AWAITING DATA</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+            <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/red_edge" data-slide-title="RED EDGE">
+              <p class="panel-description"><b>Red-Edge</b> analysis highlights unhealthy amounts of chlorophyll, an early indicator of plant stress.</p>
+              <img alt="red edge band" style="display:none" />
+              <div data-role="image-placeholder">AWAITING DATA</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+            <div class="slide" data-ros-widget="image-panel" data-topic="/micasense/images/nir" data-slide-title="NIR">
+              <p class="panel-description"><b>Near-Infrared (NIR)</b> light spans wavelengths invisible to the naked eye, but are reflected by healthy green leaves.</p>
+              <img alt="nir feed" style="display:none" />
+              <div data-role="image-placeholder">AWAITING DATA</div>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+          </div><!-- /.slideshow-track -->
+        </div><!-- /.slideshow-viewport -->
+      </div>
+
+      <!-- Row 1, Col 3: NDVI image -->
+      <div class="grid-cell widget-image" data-ros-widget="image-panel" data-topic="/traits/ndvi_image">
+        <div class="widget-header">
+          <span>&#x25CF;&nbsp;NDVI</span>
+          <span data-role="image-topic-label">—</span>
+        </div>
+        <p class="panel-description"><b>NDVI</b> analysis maps vegetation health by comparing reflectances: <b style="color:rgb(0,200,0)">green</b> indicates thriving plants; <b style="color:rgb(200,0,0)">red</b> suggests stress.</p>
+        <img alt="ndvi feed" style="display:none" />
+        <div data-role="image-placeholder">AWAITING DATA</div>
+      </div>
+
+      <!-- Row 2, Col 1: Robot 3-D viewer (URDF + live depth) -->
+      <div class="grid-cell widget-3d">
+        <div class="widget-header">
+          <span>&#x25CF;&nbsp;ROBOT-AIDED MODELLING</span>
+        </div>
+        <p class="panel-description"><b>PhenAIx</b> uses AI to plan robot and plant pedestal motions, constructing a live 3D model of what it sees.</p>
+        <canvas
+          class="ros-viewer-canvas"
+          data-ros-widget="3d"
+          data-display="urdf pointcloud"
+          data-urdf-link-whitelist="ground_plane base_link_inertia shoulder_link upper_arm_link forearm_link wrist_1_link wrist_2_link wrist_3_link micasense_body_link micasense_frame_5_link micasense_frame_4_link micasense_frame_1_link micasense_frame_3_link micasense_frame_2_link camera_link turntable_link"
+          data-pointcloud-topics="/partial_cloud"
+          data-camera-position="2.0 0 0.7"
+          data-camera-fov="30"
+          data-camera-look-at="0.15 0.5 0.2"
+          data-controls-target="0.15 0.5 0.2"
+          data-fps-throttle="10"
+          data-controls-enable-damping="true"
+          data-controls-damping-factor="0.06"
+          data-controls-min-distance="0.1"
+          data-controls-max-distance="20"
+          data-controls-auto-rotate="true"
+          data-controls-auto-rotate-speed="0.75"></canvas>
+      </div>
+
+      <!-- Row 2, Col 2: STEM careers slideshow -->
+      <div class="grid-cell widget-slideshow widget-slideshow--team" data-slideshow-interval="8000">
+        <div class="widget-header">
+          <span>&#x25CF;&nbsp;<span data-role="slideshow-title">MEET OUR STEM TEAM</span></span>
+          <!-- <div class="slideshow-dots"></div> -->
+        </div>
+        <div class="slideshow-viewport">
+          <div class="slideshow-track">
+
+	    <!-- TEAM MEMBERS IN ALPHABETICAL ORDER -->
+
+            <!-- <p class="panel-description">Meet our team and learn about our careers in <b style="color:rgb(48,40,30)">S</b>cience, <b style="color:rgb(48,40,30)">T</b>echnology, <b style="color:rgb(48,40,30)">E</b>ngineering, <b style="color:rgb(48,40,30)">M</b>aths: from Robotics &amp; AI to Plant Science.</p> -->
+
+	    <div class="slide" data-ros-widget="" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Elizabeth.png" alt="elizabeth" />
+              <p class="panel-description" data-role="image-placeholder">Elizabeth is a professor in Robotics and AI. She studied Computer Science and taught for many years before joining LIAT to work on agricultural robotics. She is Director of the Lincoln Institute for Agri-food Technology (LIAT).</p>
+              <span data-role="image-topic-label" style="display:none">—</span>
+      </div>
+
+      <div class="slide" data-ros-widget="static-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+        <img src="team_images/Heather.png" alt="heather" />
+        <p class="panel-description" data-role="image-placeholder">Heather is our stakeholder relationships manager.</p>
+        <span data-role="image-topic-label" style="display:none">—</span>
+      </div>
+
+      <div class="slide" data-ros-widget="static-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Jack.png" alt="jack" />
+              <p class="panel-description" data-role="image-placeholder">Jack is a PhD student in AI who is studying the use of AI to model aspects of leaves and canopies of strawberry plants. He is a member of the UKRI Centre for Doctoral Training in Sustainable Understandable agri-food Systems Transformed by AI (SUSTAIN). </p>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+      <div class="slide" data-ros-widget="static-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/JamesH.png" alt="james h" />
+              <p class="panel-description" data-role="image-placeholder">James H is a PhD student in Robotics who is studying "fleet management" -- how groups of robots coordinate to perform tasks together. He is a member of the EPSRC Centre for Doctoral Training in Agri-Food Robotics (AgriFoRwArdS). </p>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+      <div class="slide" data-ros-widget="static-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/JamesW.png" alt="james w" />
+              <p class="panel-description" data-role="image-placeholder">James W is a Plant Scientist and applied horticultural scientist, with susbstantial experience in and passion for STEM education.</p>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+      <div class="slide" data-ros-widget="static-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Krystian.png" alt="krystian" />
+              <p class="panel-description" data-role="image-placeholder">Krystian is a Plant specialist and technical resource manager in LIAT. He runs our geothermal glasshouse and is responsible for our strawberries, in the glasshouse as well as in our polytunnel.</p>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+      <div class="slide" data-ros-widget="static-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Lyn.png" alt="lyn" />
+              <p class="panel-description" data-role="image-placeholder">Lyn is manager of LIAT, who takes care of everything that everyone else on the team forgets to do!</p>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+            <div class="slide" data-ros-widget="static-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Marc.png" alt="marc" />
+              <p class="panel-description" data-role="image-placeholder">Marc is a professor in Robotics. He is Director of AgriFoRwArdS and Director of the Lincoln Centre for Autonomous Systems (L-CAS).</p>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+      <div class="slide" data-ros-widget="static-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Ollie.png" alt="ollie" />
+              <p class="panel-description" data-role="image-placeholder">Ollie is a postdoctoral research associate in Robotics.</p>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+      <div class="slide" data-ros-widget="static-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Paula.png" alt="paula" />
+              <p class="panel-description" data-role="image-placeholder">Paula is operations director for LIAT and senior project manager, with a PhD in biology. </p>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+      <div class="slide" data-ros-widget="static-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Rob.png" alt="rob" />
+              <p class="panel-description" data-role="image-placeholder">Rob is a Robotics specialist, a mechatronics engineer extraordinaire!</p>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+	    <div class="slide" data-ros-widget="image-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/SP2.png" alt="sp2" />
+              <p class="panel-description" data-role="image-placeholder">Simon Pa is a professor in AI and machine learning. He is Director of SUSTAIN and Research Director of LIAT.</p>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+	    <div class="slide" data-ros-widget="image-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/SP1.png" alt="sp1" />
+              <p class="panel-description" data-role="image-placeholder">Simon Pe is a professor in agricutural engineering. He is the Founding Director of the Lincoln Institute for Agri-food Technology (LIAT).</p>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+      <div class="slide" data-ros-widget="static-panel" data-topic="" data-slide-title="MEET OUR STEM TEAM">
+              <img src="team_images/Yoon.png" alt="yoon" />
+              <p class="panel-description" data-role="image-placeholder">Yoon is a postdoctoral research associate in crop physiology.</p>
+              <span data-role="image-topic-label" style="display:none">—</span>
+            </div>
+
+          </div><!-- /.slideshow-track -->
+        </div><!-- /.slideshow-viewport -->
+      </div>
+
+      <!-- Row 2, Col 3: Plant traits HTML panel -->
+      <div class="grid-cell widget-html" data-ros-widget="html-panel" data-topic="/html/dashboard">
+        <div class="widget-header">
+          <span>&#x25CF;&nbsp;PLANT TRAITS</span>
+          <span data-role="html-topic-label">—</span>
+        </div>
+        <!-- p class="panel-description"></p -->
+        <div data-role="html-content" class="html-content-inner">Waiting for plant trait data…</div>
+      </div>
+
+    </div><!-- /#app-grid -->
+  </div><!-- /#app-layout -->
+
+  <div id="bg-wallpaper"></div>
+  <div id="vignette"></div>
+  <div id="topbar">
+    <div id="logo">ROBO&#x26B9;CROPS : PhenAIx &#x21D2; Robotic Phenotyping using AI</div>
+    <div id="tagline"></div>
+    <div id="topbar-spacer"></div>
+    <div id="ws-pill">
+      <div id="ws-dot"></div>
+      <span id="ws-label">OFFLINE</span>
+    </div>
+  </div>
+
+  <div id="loading" style="display:none;"></div>
+  <script type="module" src="/assets/app.js"></script>
+  <script type="module">
+  (function () {
+    const descriptions = document.querySelectorAll('.panel-description');
+    descriptions.forEach(function (el) {
+      const text = el.textContent.trim();
+      if (!text) return;
+      el.setAttribute('title', text);
+    });
+  }());
+
+  // ── Slideshow controller ──────────────────────────────────────
+  (function () {
+    const MIN_SLIDESHOW_INTERVAL_MS = 1000;
+    const DEFAULT_SLIDESHOW_INTERVAL_MS = 10000;
+    const CELLS = document.querySelectorAll('.widget-slideshow[data-slideshow-interval]');
+
+    for (const cell of CELLS) {
+      const track    = cell.querySelector('.slideshow-track');
+      const dotsWrap = cell.querySelector('.slideshow-dots');
+      const titleEl  = cell.querySelector('[data-role="slideshow-title"]');
+      if (!track) continue;
+
+      const slides  = Array.from(track.children);
+      if (slides.length < 2) continue;
+
+      const ms      = Math.max(
+        MIN_SLIDESHOW_INTERVAL_MS,
+        parseInt(cell.dataset.slideshowInterval, 10) || DEFAULT_SLIDESHOW_INTERVAL_MS,
+      );
+      // Build progress dots (before cloning so dots only cover real slides)
+      const dots = slides.map((slide, i) => {
+        const d = document.createElement('span');
+        d.className = 'slideshow-dot' + (i === 0 ? ' active' : '');
+        if (dotsWrap) dotsWrap.appendChild(d);
+        return d;
+      });
+
+      // Append a clone of slide 0 so the wrap-around animates forward like any step
+      track.appendChild(slides[0].cloneNode(true));
+
+      let slot = 0;       // current track slot: 0..slides.length (last = clone of slide 0)
+      let snapping = false;
+
+      const updateMeta = (logicalIdx) => {
+        dots.forEach((d, i) => d.classList.toggle('active', i === logicalIdx));
+        const label = slides[logicalIdx].dataset.slideTitle || '';
+        if (titleEl && label) titleEl.textContent = label;
+      };
+
+      const jumpTo = (s) => {
+        // Instant jump with no animation (disable transition, move, force reflow, re-enable)
+        track.style.transition = 'none';
+        track.style.transform = `translateX(-${s * 100}%)`;
+        void track.offsetWidth; // flush paint so the above takes effect before transition restores
+        track.style.transition = '';
+        slot = s;
+        updateMeta(s % slides.length);
+      };
+
+      const advance = () => {
+        if (snapping) return;
+        const next = slot + 1;
+        track.style.transform = `translateX(-${next * 100}%)`;
+        slot = next;
+        updateMeta(next % slides.length);
+
+        if (next === slides.length) {
+          // Just moved to the clone of slide 0; after the animation silently jump back to real slide 0
+          snapping = true;
+          track.addEventListener('transitionend', () => {
+            jumpTo(0);
+            snapping = false;
+          }, { once: true });
+        }
+      };
+
+      jumpTo(0);
+      setInterval(advance, ms);
+    }
+  }());
+  </script>
+</body>
+</html>

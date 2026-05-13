@@ -34,7 +34,8 @@ html, body {
 #bg-wallpaper {
   position: fixed;
   inset: 0;
-  background-image: url('/assets/assets/background.jpg');
+  /*background-image: url('../assets/assets/background.jpg');*/
+  background-image: url('../assets/background.jpg');
   background-size: cover;
   background-position: center;
   opacity: 0.85;
@@ -135,11 +136,14 @@ html, body {
   width: min(100%, calc((100vh - 52px) * 16 / 9));
   aspect-ratio: 16 / 9;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(2, 1fr);
+  /*grid-template-columns: repeat(3, 1fr);*/
+  /*grid-template-rows: repeat(2, 1fr);*/
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(1, 1fr);
   gap: 8px;
   padding: 8px;
 }
+
 
 /* ── Shared grid cell ──────────────────────────────────────── */
 .grid-cell {

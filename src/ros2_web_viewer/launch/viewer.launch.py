@@ -10,7 +10,7 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, Shutdown
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.descriptions import ParameterFile
@@ -32,5 +32,13 @@ def generate_launch_description():
             name='ros2_web_viewer',
             output='screen',
             parameters=[ParameterFile(LaunchConfiguration('params_file'), allow_substs=True)],
+        ),
+
+        Node(
+            package='ros2_web_viewer',
+            executable='restart_service_node',
+            name='restart_service_node',
+            output='screen',
+            on_exit=Shutdown(reason='restart_service_node exited'),
         ),
     ])

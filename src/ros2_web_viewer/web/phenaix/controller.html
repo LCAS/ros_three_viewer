@@ -94,6 +94,7 @@
     .ctrl-btn-scan   { border-color: rgba(74, 122, 58, 0.70); }
     .ctrl-btn-stop   { border-color: rgba(192, 101, 74, 0.70); }
     .ctrl-btn-print  { border-color: rgba(74,  65, 51, 0.60); }
+    .ctrl-btn-restart { border-color: rgba(192, 101, 74, 0.85); }
 
     .ctrl-param-label {
       font-family: var(--font);
@@ -205,6 +206,20 @@
             <rect x="6" y="14" width="12" height="8"/>
           </svg>
           Print
+        </button>
+
+        <button
+          class="ctrl-btn ctrl-btn-restart"
+          data-trigger-service="/restart_system"
+          data-trigger-confirm="Restart the system now?"
+          data-trigger-timeout="2"
+          data-trigger-cooldown="3">
+          <!-- Restart icon -->
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15A9 9 0 1 1 23 10"/>
+          </svg>
+          Restart
         </button>
 
         </div><!-- /.controls-content -->

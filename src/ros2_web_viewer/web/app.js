@@ -1564,6 +1564,10 @@ function bindTriggerButtons(root) {
       evt.preventDefault();
       const service = String(button.getAttribute('data-trigger-service') || '').trim();
       if (!service) return;
+      const confirmMessage = String(button.getAttribute('data-trigger-confirm') || '').trim();
+      if (confirmMessage && !window.confirm(confirmMessage)) {
+        return;
+      }
 
       const timeoutRaw = Number.parseFloat(
         button.getAttribute('data-trigger-timeout') || String(TRIGGER_TIMEOUT_DEFAULT),

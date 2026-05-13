@@ -38,30 +38,31 @@
 	    <div class="slide" data-ros-widget="image-panel" data-topic="/capture/color/image_raw" data-slide-title="VISIBLE TRAITS: 3D MODEL">
               <p class="panel-description">The <b>robot system</b> uses AI to plan its motions (arm&amp;camera), as well as the plant pedestal, to construct a live 3D model of what it sees.</p>
               <canvas
-		class="ros-viewer-canvas"
-		data-ros-widget="3d"
-		data-display="urdf pointcloud"
-		data-urdf-link-whitelist="ground_plane base_link_inertia shoulder_link upper_arm_link forearm_link wrist_1_link wrist_2_link wrist_3_link micasense_body_link micasense_frame_5_link micasense_frame_4_link micasense_frame_1_link micasense_frame_3_link micasense_frame_2_link camera_link turntable_link"
-		data-pointcloud-topics="/partial_cloud"
-		data-camera-position="2.0 0 0.7"
-		data-camera-fov="30"
-		data-camera-look-at="0.15 0.5 0.2"
-		data-controls-target="0.15 0.5 0.2"
-		data-fps-throttle="10"
-		data-controls-enable-damping="true"
-		data-controls-damping-factor="0.06"
-		data-controls-min-distance="0.1"
-		data-controls-max-distance="20"
-		data-controls-auto-rotate="true"
-		data-controls-auto-rotate-speed="0.75"></canvas>
+                class="ros-viewer-canvas"
+                data-ros-widget="3d"
+                data-display="urdf pointcloud"
+                data-urdf-link-whitelist="ground_plane base_link_inertia shoulder_link upper_arm_link forearm_link wrist_1_link wrist_2_link wrist_3_link micasense_body_link micasense_frame_5_link micasense_frame_4_link micasense_frame_1_link micasense_frame_3_link micasense_frame_2_link camera_link turntable_link"
+                data-pointcloud-topics="/partial_cloud"
+                data-camera-position="2.0 0 0.7"
+                data-camera-fov="30"
+                data-camera-look-at="0.15 0.5 0.2"
+                data-controls-target="0.15 0.5 0.2"
+                data-fps-throttle="10"
+                data-controls-enable-damping="true"
+                data-controls-damping-factor="0.06"
+                data-controls-min-distance="0.1"
+                data-controls-max-distance="20"
+                data-controls-auto-rotate="true"
+                data-controls-auto-rotate-speed="0.75">
+              </canvas>
 	    </div>
 
-            <div class="slide" data-ros-widget="image-panel" data-topic="/leaf_count/annotated_image" data-slide-title="VISIBLE TRAITS: LEAF COUNT">
-              <p class="panel-description">An <b>AI model</b> -- trained by a scientist -- detects and counts individual leaves found within each image of the plant, helping track plant growth.</p>
-              <img alt="leaf count" style="display:none" />
-              <div data-role="image-placeholder">AWAITING DATA</div>
-              <span data-role="image-topic-label" style="display:none">—</span>
-            </div>
+      <div class="slide" data-ros-widget="image-panel" data-topic="/leaf_count/annotated_image" data-slide-title="VISIBLE TRAITS: LEAF COUNT">
+        <p class="panel-description">An <b>AI model</b> -- trained by a scientist -- detects and counts individual leaves found within each image of the plant, helping track plant growth.</p>
+        <img alt="leaf count" style="display:none" />
+        <div data-role="image-placeholder">AWAITING DATA</div>
+        <span data-role="image-topic-label" style="display:none">—</span>
+      </div>
 
 	  </div>
 	</div>

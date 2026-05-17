@@ -46,7 +46,7 @@
 
     .ctrl-btn {
       width: 100%;
-      min-height: clamp(64px, 10vh, 100px);
+      min-height: clamp(32px, 5vh, 50px);
       padding: 0 24px;
       border: 2px solid rgba(74, 65, 51, 0.50);
       border-radius: 10px;
@@ -159,6 +159,7 @@
         <label class="ctrl-param-label">Services</label>
         <button
           class="ctrl-btn ctrl-btn-scan"
+          style="background: rgb(102, 177, 98);"
           data-trigger-service="/start_capture"
           data-trigger-timeout="10"
           data-trigger-cooldown="1">
@@ -172,6 +173,7 @@
 
         <button
           class="ctrl-btn ctrl-btn-stop"
+          style="background: rgb(252, 195, 121);"
           data-trigger-service="/cancel_capture"
           data-trigger-timeout="5"
           data-trigger-cooldown="1">
@@ -196,6 +198,7 @@
 
         <button
           class="ctrl-btn ctrl-btn-print"
+          style="background: rgb(152, 202, 255);"
           data-trigger-service="/print"
           data-trigger-timeout="10"
           data-trigger-cooldown="1">
@@ -210,6 +213,7 @@
 
         <button
           class="ctrl-btn ctrl-btn-restart"
+          style="background: rgb(255, 152, 134);"
           data-trigger-service="/restart_system"
           data-trigger-confirm="Restart the system now?"
           data-trigger-timeout="2"

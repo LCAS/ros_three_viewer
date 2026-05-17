@@ -33,4 +33,4 @@
     image_topic_broadcast_hz: "{}"       # Optional per-topic image rates as JSON/Python dict, e.g. {'/cam/front': 2.0}
     pointcloud_topic_broadcast_hz: "{}"  # Optional per-topic point cloud rates as JSON/Python dict, e.g. {'/points': 0.5}
     pointcloud_max_points: 400000   # Maximum points per cloud (heavier clouds are downsampled)
-    image_jpeg_quality: 65          # JPEG quality for compressed image bridge (1-100; lower = faster but blurrier)
+    image_jpeg_quality: 90          # JPEG quality for compressed image bridge (1-100; lower = faster but blurrier)

@@ -23,6 +23,20 @@
       line-height: 1.35;
       letter-spacing: 0.02em;
       z-index: 1;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .dashboard-summary-main {
+      flex: 1 1 520px;
+      min-width: 280px;
+    }
+
+    .dashboard-summary-main p {
+      margin: 0;
     }
 
     .dashboard-summary strong {
@@ -30,15 +44,60 @@
       font-weight: 700;
     }
 
+    .dashboard-summary-profile-box {
+      flex: 0 0 auto;
+      min-width: 400px;
+      max-width: 400px;
+      border: 1px solid rgba(224, 220, 169, 0.44);
+      border-radius: 4px;
+      background:
+        linear-gradient(180deg, rgba(224, 220, 169, 0.18) 0%, rgba(224, 220, 169, 0.08) 100%);
+      box-shadow:
+        inset 0 0 0 1px rgba(224, 220, 169, 0.08),
+        0 4px 14px rgba(0, 0, 0, 0.20);
+      padding: 7px 9px;
+      text-align: left;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .dashboard-summary-profile-box::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, rgba(224, 220, 169, 0.95) 0%, rgba(224, 220, 169, 0.35) 100%);
+    }
+
+    .dashboard-summary-profile-label {
+      margin: 0;
+      font-size: 0.75rem;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: rgba(224, 220, 169, 0.90);
+      font-weight: 700;
+      padding-left: 8px;
+    }
+
     .dashboard-summary-profile {
-      margin-top: 3px;
-      font-size: 0.9rem;
-      opacity: 0.95;
+      margin: 2px 0 0;
+      font-size: 1.02rem;
+      opacity: 1;
+      line-height: 1.3;
+      padding-left: 8px;
     }
 
     .dashboard-summary-profile-name {
       color: var(--cream);
       font-weight: 700;
+      display: inline-block;
+      background: rgba(48, 40, 30, 0.36);
+      border: 1px solid rgba(224, 220, 169, 0.30);
+      border-radius: 3px;
+      padding: 1px 6px;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
     }
 
     .sr-only {
@@ -68,9 +127,16 @@
     <div id="app-grid">
 
       <section class="dashboard-summary" aria-live="polite">
-        <p>Welcome to the <strong>PhenAIx</strong> robot scanning plants at the Chelsea Flower Show 2026.<br>
-          PhenAIx is a compact robotics system that brings together horticulture and cutting‑edge STEM. A robotic arm uses advanced sensors and artificial intelligence to scan living plants, revealing details about their health, structure and growth that cannot be seen with the naked eye.  </p>
-        <p class="dashboard-summary-profile">Current plant profile: <span id="current-plant-profile" class="dashboard-summary-profile-name">Loading...</span></p>
+        <div class="dashboard-summary-main">
+          <p>Welcome to the <strong>PhenAIx</strong> robot scanning plants at the Chelsea Flower Show 2026.<br>
+            PhenAIx is a compact robotics system that brings together horticulture and cutting-edge STEM. A robotic arm uses advanced sensors and artificial intelligence to scan living plants, revealing details about their health, structure and growth that cannot be seen with the naked eye.</p>
+        </div>
+
+        <aside class="dashboard-summary-profile-box" aria-label="Current plant profile">
+          <p class="dashboard-summary-profile-label">Current Plant Profile</p>
+          <p class="dashboard-summary-profile"><span id="current-plant-profile" class="dashboard-summary-profile-name">Loading...</span></p>
+        </aside>
+
         <label class="sr-only" for="dashboard-plant-profile-sync">Plant profile sync</label>
         <select
           id="dashboard-plant-profile-sync"
@@ -220,10 +286,10 @@
       const formattedProfileByValue = {
         plant_profile: 'Generic',
         eastern_african_lily: '<i>Agapanthus praecox</i> subsp. <i>orientalis</i>',
-        japanese_aralia: '<i>Fatsia japonica</i> \u2018Tsumugi-shibori\u2019',
-        spanish_bayonet: '<i>Yucca aloifolia</i> red experimental (yet to be named)',
-        tomato: "tomato 'Totem'",
-        strawberry: "strawberry 'Malling Centenary'",
+        japanese_aralia: '<i>Fatsia japonica</i><br> \u2018Tsumugi-shibori\u2019',
+        spanish_bayonet: '<i>Yucca aloifolia</i><br>red experimental<br>(yet to be named)',
+        tomato: "tomato <br>'Totem'",
+        strawberry: "strawberry <br>'Malling Centenary'",
       };
 
       const isBackendLive = () => {

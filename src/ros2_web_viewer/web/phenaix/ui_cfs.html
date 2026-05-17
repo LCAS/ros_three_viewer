@@ -6,6 +6,53 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ROBO*CROPS : PhenAIx </title>
   <link rel="stylesheet" href="style_cfs.css" />
+  <style>
+    #app-grid {
+      grid-template-rows: auto 1fr;
+    }
+
+    .dashboard-summary {
+      grid-column: 1 / -1;
+      border: 1px solid rgba(74, 65, 51, 0.40);
+      border-radius: 4px;
+      background: rgba(48, 40, 30, 0.76);
+      color: rgba(224, 220, 169, 0.92);
+      padding: 8px 12px;
+      font-family: var(--font);
+      font-size: 0.95rem;
+      line-height: 1.35;
+      letter-spacing: 0.02em;
+      z-index: 1;
+    }
+
+    .dashboard-summary strong {
+      color: var(--cream);
+      font-weight: 700;
+    }
+
+    .dashboard-summary-profile {
+      margin-top: 3px;
+      font-size: 0.9rem;
+      opacity: 0.95;
+    }
+
+    .dashboard-summary-profile-name {
+      color: var(--cream);
+      font-weight: 700;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  </style>
   <script type="importmap">
   {
     "imports": {
@@ -19,6 +66,30 @@
 <body>
   <div id="app-layout">
     <div id="app-grid">
+
+      <section class="dashboard-summary" aria-live="polite">
+        <p>Welcome to the <strong>PhenAIx</strong> robot scanning plants at the Chelsea Flower Show 2026.<br>
+          PhenAIx is a compact robotics system that brings together horticulture and cutting‑edge STEM. A robotic arm uses advanced sensors and artificial intelligence to scan living plants, revealing details about their health, structure and growth that cannot be seen with the naked eye.  </p>
+        <p class="dashboard-summary-profile">Current plant profile: <span id="current-plant-profile" class="dashboard-summary-profile-name">Loading...</span></p>
+        <label class="sr-only" for="dashboard-plant-profile-sync">Plant profile sync</label>
+        <select
+          id="dashboard-plant-profile-sync"
+          class="sr-only"
+          aria-hidden="true"
+          tabindex="-1"
+          data-ros-param-node="/morphological_traits_extractor_node"
+          data-ros-param-name="plant_profile"
+          data-ros-param-type="string"
+          data-ros-param-default="plant_profile"
+          data-ros-param-sync-sec="2">
+          <option value="plant_profile">Generic</option>
+          <option value="eastern_african_lily">Agapanthus praecox subsp. orientalis</option>
+          <option value="japanese_aralia">Fatsia japonica 'Tsumugi-shibori'</option>
+          <option value="spanish_bayonet">Yucca aloifolia red experimental (yet to be named)</option>
+          <option value="tomato">tomato 'Totem'</option>
+          <option value="strawberry">strawberry 'Malling Centenary'</option>
+        </select>
+      </section>
 
       <!-- Row 1, Col 1: architectural traits slideshow -->
       <div class="grid-cell widget-slideshow" data-slideshow-interval="12000">
@@ -139,6 +210,89 @@
   <div id="loading" style="display:none;"></div>
   <script type="module" src="/assets/app.js"></script>
   <script type="module">
+    (function () {
+      const select = document.getElementById('dashboard-plant-profile-sync');
+      const profileLabel = document.getElementById('current-plant-profile');
+      const wsLabel = document.getElementById('ws-label');
+      const wsDot = document.getElementById('ws-dot');
+      if (!select || !profileLabel) return;
+
+      const formattedProfileByValue = {
+        plant_profile: 'Generic',
+        eastern_african_lily: '<i>Agapanthus praecox</i> subsp. <i>orientalis</i>',
+        japanese_aralia: '<i>Fatsia japonica</i> \u2018Tsumugi-shibori\u2019',
+        spanish_bayonet: '<i>Yucca aloifolia</i> red experimental (yet to be named)',
+        tomato: "tomato 'Totem'",
+        strawberry: "strawberry 'Malling Centenary'",
+      };
+
+      const isBackendLive = () => {
+        const labelText = wsLabel ? String(wsLabel.textContent || '').trim().toUpperCase() : '';
+        if (labelText) return labelText === 'LIVE';
+        return wsDot ? wsDot.classList.contains('connected') : false;
+      };
+
+      const renderProfile = () => {
+        if (!isBackendLive()) {
+          profileLabel.textContent = 'none';
+          return;
+        }
+
+        const selected = select.options[select.selectedIndex] || null;
+        const value = selected ? String(selected.value || '').trim() : '';
+        const formattedProfile = formattedProfileByValue[value];
+        if (formattedProfile) {
+          profileLabel.innerHTML = formattedProfile;
+          return;
+        }
+        const fallbackProfile = selected && selected.textContent
+          ? selected.textContent.trim()
+          : 'Unknown';
+        profileLabel.textContent = fallbackProfile || 'Unknown';
+      };
+
+      renderProfile();
+
+      select.addEventListener('change', renderProfile);
+
+      // app.js updates parameter controls programmatically, so poll to catch remote changes.
+      let lastValue = select.value;
+      window.setInterval(() => {
+        if (select.value !== lastValue) {
+          lastValue = select.value;
+          renderProfile();
+        }
+      }, 500);
+
+      const observer = new MutationObserver(() => {
+        if (select.value !== lastValue) {
+          lastValue = select.value;
+        }
+        renderProfile();
+      });
+
+      observer.observe(select, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+      });
+
+      if (wsLabel) {
+        observer.observe(wsLabel, {
+          childList: true,
+          characterData: true,
+          subtree: true,
+        });
+      }
+
+      if (wsDot) {
+        observer.observe(wsDot, {
+          attributes: true,
+          attributeFilter: ['class'],
+        });
+      }
+    }());
+
     (function () {
       const descriptions = document.querySelectorAll('.panel-description');
       descriptions.forEach(function (el) {
